@@ -1,5 +1,4 @@
 // In batch_model.dart
-
 import 'package:dancekatta/models/branch_model.dart'; // Add this line to import BranchModel
 import 'package:dancekatta/services/branches_service.dart'; // Import BranchesService for fetching branch details
 
