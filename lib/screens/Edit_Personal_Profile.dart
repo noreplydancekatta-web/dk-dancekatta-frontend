@@ -182,17 +182,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   void _sanitizeSkills() {
     setState(() {
-      _skills = _skills
-          .where(
-            (s) =>
-                s['style'] != null &&
-                s['style']!.isNotEmpty &&
-                _danceStyles.contains(s['style']) &&
-                s['level'] != null &&
-                s['level']!.isNotEmpty &&
-                _levels.contains(s['level']),
-          )
-          .toList();
+      _skills = _skills.where((s) {
+        final style = s['style'];
+        final level = s['level'];
+
+        if (style == null || style.isEmpty) return false;
+        if (level == null || level.isEmpty) return false;
+
+        return true; // ✅ do NOT depend on dropdown data
+      }).toList();
     });
   }
 
@@ -252,24 +250,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
-void _syncSavedAddressWithDropdowns() {
-  setState(() {
-    if (_cityController.text.isNotEmpty &&
-        !_cities.contains(_cityController.text)) {
-      _cities.insert(0, _cityController.text);
-    }
 
-    if (_stateController.text.isNotEmpty &&
-        !_states.contains(_stateController.text)) {
-      _states.insert(0, _stateController.text);
-    }
+  void _syncSavedAddressWithDropdowns() {
+    setState(() {
+      if (_cityController.text.isNotEmpty &&
+          !_cities.contains(_cityController.text)) {
+        _cities.insert(0, _cityController.text);
+      }
 
-    if (_countryController.text.isNotEmpty &&
-        !_countries.contains(_countryController.text)) {
-      _countries.insert(0, _countryController.text);
-    }
-  });
-}
+      if (_stateController.text.isNotEmpty &&
+          !_states.contains(_stateController.text)) {
+        _states.insert(0, _stateController.text);
+      }
+
+      if (_countryController.text.isNotEmpty &&
+          !_countries.contains(_countryController.text)) {
+        _countries.insert(0, _countryController.text);
+      }
+    });
+  }
+
   Future<void> _fetchDropdowns() async {
     try {
       final responses = await Future.wait([
@@ -288,12 +288,11 @@ void _syncSavedAddressWithDropdowns() {
         _levels = [for (var e in jsonDecode(responses[4].body)) e['name']];
         _loadingDropdowns = false;
 
-     
         print(
           'Dropdowns loaded - Cities: ${_cities.length}, States: ${_states.length}, Countries: ${_countries.length}, Dance Styles: ${_danceStyles.length}, Levels: ${_levels.length}',
         );
       });
-      _syncSavedAddressWithDropdowns(); 
+      _syncSavedAddressWithDropdowns();
       _sanitizeSkills();
     } catch (e) {
       print('Error fetching dropdowns: $e');
@@ -374,9 +373,10 @@ void _syncSavedAddressWithDropdowns() {
         .toList();
 
     // Filter available styles
-    final availableStyles = _danceStyles
-        .where((s) => !selectedStyles.contains(s))
-        .toList();
+    final availableStyles = {
+      ..._danceStyles,
+      if (currentStyle != null && currentStyle.isNotEmpty) currentStyle,
+    }.where((s) => !selectedStyles.contains(s) || s == currentStyle).toList();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

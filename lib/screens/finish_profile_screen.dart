@@ -165,17 +165,16 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
 
   void _sanitizeSkills() {
     setState(() {
-      _skills = _skills
-          .where(
-            (s) =>
-                s['style'] != null &&
-                s['style']!.isNotEmpty &&
-                _danceStyles.contains(s['style']) &&
-                s['level'] != null &&
-                s['level']!.isNotEmpty &&
-                _levels.contains(s['level']),
-          )
-          .toList();
+      _skills = _skills.where((s) {
+        final style = s['style'];
+        final level = s['level'];
+
+        // keep skill if both values exist
+        if (style == null || style.isEmpty) return false;
+        if (level == null || level.isEmpty) return false;
+
+        return true; // 🔥 DO NOT check against dropdown lists
+      }).toList();
     });
   }
 
@@ -358,9 +357,10 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
         .toList();
 
     // Filter dance styles to remove already selected ones
-    final availableStyles = _danceStyles
-        .where((s) => !selectedStyles.contains(s))
-        .toList();
+    final availableStyles = {
+      ..._danceStyles,
+      if (currentStyle != null && currentStyle.isNotEmpty) currentStyle,
+    }.where((s) => !selectedStyles.contains(s) || s == currentStyle).toList();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

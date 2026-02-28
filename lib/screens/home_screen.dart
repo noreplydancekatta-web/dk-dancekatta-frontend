@@ -6,6 +6,7 @@ import 'home_tab.dart';
 import 'explore_tab.dart';
 import 'messages_screen.dart';
 import '../constants.dart'; // ✅ import for getFullImageUrl
+import 'my_batches_screen.dart';
 
 // Global ValueNotifier to manage the state of new messages
 final ValueNotifier<bool> hasNewMessages = ValueNotifier<bool>(false);
@@ -57,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _tabs = [
           HomeTab(user: _currentUser),
           ExploreScreen(user: _currentUser),
+          MyBatchesScreen(user: _currentUser),
           MessagesScreen(user: _currentUser),
         ];
       });
@@ -70,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _tabs = [
       HomeTab(user: _currentUser),
       ExploreScreen(user: _currentUser),
+      MyBatchesScreen(user: _currentUser),
       MessagesScreen(user: _currentUser),
     ];
   }
@@ -142,6 +145,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.explore),
             label: 'Batches',
           ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.star),
+            label: 'My Batches',
+          ),
+
           BottomNavigationBarItem(
             icon: ValueListenableBuilder<bool>(
               valueListenable: hasNewMessages,
