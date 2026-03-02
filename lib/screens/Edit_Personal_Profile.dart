@@ -79,7 +79,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   /// Check if user is 18 years or older
   bool get _isUserAdult {
-    if (_dobController.text.isEmpty) return true; // Default to adult if no DOB
+    if (_dobController.text.isEmpty) return true;
     try {
       final birthDate = DateTime.parse(_dobController.text);
       final today = DateTime.now();
@@ -92,7 +92,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
       return age >= 18;
     } catch (e) {
-      return true; // Default to adult if date parsing fails
+      return true;
     }
   }
 
@@ -185,16 +185,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _skills = _skills.where((s) {
         final style = s['style'];
         final level = s['level'];
-
         if (style == null || style.isEmpty) return false;
         if (level == null || level.isEmpty) return false;
-
-        return true; // ✅ do NOT depend on dropdown data
+        return true;
       }).toList();
     });
   }
 
-  //fetch the data based on pincode
   Future<void> _fetchAddressFromPincode(String pincode) async {
     if (pincode.length != 6) return;
 
@@ -214,21 +211,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             data[0]['PostOffice'].isNotEmpty) {
           final postOffice = data[0]['PostOffice'][0];
 
-          // ✅ Use Name instead of District
           final city = postOffice['Name'] ?? '';
           final state = postOffice['State'] ?? '';
           final country = postOffice['Country'] ?? 'India';
 
           setState(() {
-            if (!_cities.contains(city) && city.isNotEmpty) {
+            if (!_cities.contains(city) && city.isNotEmpty)
               _cities.insert(0, city);
-            }
-            if (!_states.contains(state) && state.isNotEmpty) {
+            if (!_states.contains(state) && state.isNotEmpty)
               _states.insert(0, state);
-            }
-            if (!_countries.contains(country) && country.isNotEmpty) {
+            if (!_countries.contains(country) && country.isNotEmpty)
               _countries.insert(0, country);
-            }
 
             _cityController.text = city;
             _stateController.text = state;
@@ -257,12 +250,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           !_cities.contains(_cityController.text)) {
         _cities.insert(0, _cityController.text);
       }
-
       if (_stateController.text.isNotEmpty &&
           !_states.contains(_stateController.text)) {
         _states.insert(0, _stateController.text);
       }
-
       if (_countryController.text.isNotEmpty &&
           !_countries.contains(_countryController.text)) {
         _countries.insert(0, _countryController.text);
@@ -287,61 +278,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _danceStyles = [for (var e in jsonDecode(responses[3].body)) e['name']];
         _levels = [for (var e in jsonDecode(responses[4].body)) e['name']];
         _loadingDropdowns = false;
-
-        print(
-          'Dropdowns loaded - Cities: ${_cities.length}, States: ${_states.length}, Countries: ${_countries.length}, Dance Styles: ${_danceStyles.length}, Levels: ${_levels.length}',
-        );
       });
       _syncSavedAddressWithDropdowns();
       _sanitizeSkills();
     } catch (e) {
       print('Error fetching dropdowns: $e');
-      setState(() {
-        _loadingDropdowns = false;
-      });
+      setState(() => _loadingDropdowns = false);
     }
   }
 
-  // Helper to build full URL for uploaded images
   String getFullImageUrl(String? filePath) {
     if (filePath == null || filePath.isEmpty) return '';
-    // If backend returns path like "/uploads/filename.jpg", prepend host
     if (filePath.startsWith('/uploads/')) {
       return 'http://147.93.19.17:5002$filePath';
     }
-    return filePath; // fallback if already full URL
-  }
-
-  Future<void> _pickImage() async {
-    try {
-      final pickedFile = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-      );
-      if (pickedFile == null) return;
-
-      setState(() => _isSubmitting = true);
-
-      // Use centralized UploadService
-      String relativePath = await UploadService.uploadImage(
-        File(pickedFile.path),
-        "api/users/profile-image", // ✅ use correct endpoint
-      );
-
-      setState(() {
-        _profilePhoto = relativePath; // store only relative path
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile image uploaded successfully')),
-      );
-    } catch (e) {
-      debugPrint('Error uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error uploading profile image')),
-      );
-    } finally {
-      setState(() => _isSubmitting = false);
-    }
+    return filePath;
   }
 
   Future<void> _pickDate() async {
@@ -359,11 +310,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _spacedField(Widget child) =>
       Padding(padding: const EdgeInsets.only(bottom: 12), child: child);
 
+  // ✅ Required label with red * mark
+  Widget _requiredLabel(String text) {
+    return RichText(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(color: Colors.black87, fontSize: 16),
+        children: const [
+          TextSpan(
+            text: ' *',
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSkillField(int index) {
     final String? currentStyle = _skills[index]['style'];
     final String? currentLevel = _skills[index]['level'];
 
-    // Get all styles selected in other rows to prevent duplicates
     final selectedStyles = _skills
         .asMap()
         .entries
@@ -372,7 +338,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         .where((s) => s != null && s.isNotEmpty)
         .toList();
 
-    // Filter available styles
     final availableStyles = {
       ..._danceStyles,
       if (currentStyle != null && currentStyle.isNotEmpty) currentStyle,
@@ -383,7 +348,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Dance Style Dropdown
           Expanded(
             flex: 4,
             child: DropdownMenu<String>(
@@ -417,10 +381,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
           ),
-
           const SizedBox(width: 8),
-
-          // Level Dropdown
           Expanded(
             flex: 4,
             child: DropdownMenu<String>(
@@ -455,8 +416,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
           ),
           const SizedBox(width: 4),
-
-          // Delete Button
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red, size: 20),
             padding: EdgeInsets.zero,
@@ -509,16 +468,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    // 2️⃣ Skill validation: level required if style is selected
+    // 2️⃣ Validate profile photo
+    if (_profilePhoto == null || _profilePhoto!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile photo is required'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 3️⃣ Validate professional choreographer selection
+    if (_isProfessional == null || _isProfessional!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please select if you are a professional choreographer',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 4️⃣ Validate experience if professional
+    if (_isProfessional == 'Yes' && _experienceController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Teaching experience is required for professional choreographers',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 5️⃣ Skill validation
     for (int i = 0; i < _skills.length; i++) {
       final style = _skills[i]['style'];
       final level = _skills[i]['level'];
-
       if (style != null && style.isNotEmpty) {
         if (level == null || level.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Please select an expertise level for "${style}"'),
+              content: Text('Please select an expertise level for "$style"'),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -527,8 +522,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
     }
-    // 3️⃣ Proceed with your existing update logic
+
     setState(() => _isSubmitting = true);
+
     try {
       final userId = widget.user.id;
       if (userId == null || userId.isEmpty) {
@@ -560,7 +556,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         "instagram": _instagramController.text,
         "isProfessional": _isProfessional,
         "experience": _experienceController.text,
-        // ✅ Always send only the relative path
         "profilePhoto":
             (_profilePhoto != null && _profilePhoto!.startsWith('/uploads/'))
             ? _profilePhoto
@@ -570,14 +565,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         "skills": _skills,
       };
 
-      // Use the user service to update the profile
       final updatedUser = await UserService.updateUserProfile(
         userId,
         updatedData,
       );
 
       if (updatedUser != null) {
-        Navigator.pop(context, updatedUser); // <-- return updated user
+        Navigator.pop(context, updatedUser);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated successfully')),
         );
@@ -594,9 +588,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const SnackBar(content: Text('An error occurred. Please try again.')),
       );
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      setState(() => _isSubmitting = false);
     }
   }
 
@@ -619,33 +611,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      // In your build method
+                      // ✅ Profile Photo with red * indicator
                       GestureDetector(
                         onTap: () async {
-                          // Pick image using ImagePicker
                           final pickedFile = await ImagePicker().pickImage(
                             source: ImageSource.gallery,
                           );
                           if (pickedFile == null) return;
 
-                          setState(() {
-                            _isSubmitting =
-                                true; // Show loading indicator while uploading
-                          });
+                          setState(() => _isSubmitting = true);
 
                           try {
-                            // Upload image using the helper
-                            String
-                            relativePath = await UploadService.uploadImage(
-                              File(pickedFile.path),
-                              "api/users/profile-image", // ✅ use correct endpoint
-                            );
-
-                            // Save only relative path (e.g. /uploads/profile/abc.jpg)
-                            setState(() {
-                              _profilePhoto = relativePath;
-                            });
-
+                            String relativePath =
+                                await UploadService.uploadImage(
+                                  File(pickedFile.path),
+                                  "api/users/profile-image",
+                                );
+                            setState(() => _profilePhoto = relativePath);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(
@@ -665,71 +647,96 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                             );
                           } finally {
-                            setState(() {
-                              _isSubmitting = false;
-                            });
+                            setState(() => _isSubmitting = false);
                           }
                         },
-                        child: CircleAvatar(
-                          radius: 55,
-                          backgroundColor: Colors.grey[200],
-                          backgroundImage:
-                              (_profilePhoto != null &&
-                                  _profilePhoto!.isNotEmpty &&
-                                  !_isSubmitting)
-                              ? NetworkImage(getFullImageUrl(_profilePhoto))
-                              : null,
-                          child: _isSubmitting
-                              ? const CircularProgressIndicator(
-                                  color: Colors.blue,
-                                )
-                              : (_profilePhoto == null || _profilePhoto!.isEmpty
-                                    ? const Icon(
-                                        Icons.person,
-                                        size: 55,
-                                        color: Colors.grey,
-                                      )
-                                    : null),
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 55,
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage:
+                                  (_profilePhoto != null &&
+                                      _profilePhoto!.isNotEmpty &&
+                                      !_isSubmitting)
+                                  ? NetworkImage(getFullImageUrl(_profilePhoto))
+                                  : null,
+                              child: _isSubmitting
+                                  ? const CircularProgressIndicator(
+                                      color: Colors.blue,
+                                    )
+                                  : (_profilePhoto == null ||
+                                            _profilePhoto!.isEmpty
+                                        ? const Icon(
+                                            Icons.person,
+                                            size: 55,
+                                            color: Colors.grey,
+                                          )
+                                        : null),
+                            ),
+                            const SizedBox(height: 6),
+                            // ✅ Red * label below avatar
+                            RichText(
+                              text: const TextSpan(
+                                text: 'Profile Photo',
+                                style: TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 13,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: ' *',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
                       const SizedBox(height: 20),
+
+                      // ✅ First Name *
                       _spacedField(
                         TextFormField(
                           controller: _firstNameController,
-                          textCapitalization:
-                              TextCapitalization.words, // Capitalize text
-                          inputFormatters: [
-                            CapitalizeWordsFormatter(), // <-- Added your custom formatter
-                          ],
-                          decoration: const InputDecoration(
-                            labelText: 'First Name',
+                          textCapitalization: TextCapitalization.words,
+                          inputFormatters: [CapitalizeWordsFormatter()],
+                          decoration: InputDecoration(
+                            label: _requiredLabel('First Name'),
                           ),
                           validator: (value) => value?.isEmpty == true
                               ? 'First name is required'
                               : null,
                         ),
                       ),
+
+                      // ✅ Last Name *
                       _spacedField(
                         TextFormField(
                           controller: _lastNameController,
-                          textCapitalization:
-                              TextCapitalization.words, // Capitalize text
-                          inputFormatters: [
-                            CapitalizeWordsFormatter(), // <-- Added your custom formatter
-                          ],
-                          decoration: const InputDecoration(
-                            labelText: 'Last Name',
+                          textCapitalization: TextCapitalization.words,
+                          inputFormatters: [CapitalizeWordsFormatter()],
+                          decoration: InputDecoration(
+                            label: _requiredLabel('Last Name'),
                           ),
                           validator: (value) => value?.isEmpty == true
                               ? 'Last name is required'
                               : null,
                         ),
                       ),
+
+                      // ✅ Email *
                       _spacedField(
                         TextFormField(
                           controller: _emailController,
-                          decoration: const InputDecoration(labelText: 'Email'),
+                          decoration: InputDecoration(
+                            label: _requiredLabel('Email'),
+                          ),
                           validator: (value) {
                             if (value?.isEmpty == true)
                               return 'Email is required';
@@ -742,11 +749,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           },
                         ),
                       ),
+
+                      // ✅ Mobile *
                       _spacedField(
                         TextFormField(
                           controller: _mobileController,
-                          decoration: const InputDecoration(
-                            labelText: 'Mobile',
+                          decoration: InputDecoration(
+                            label: _requiredLabel('Mobile'),
                           ),
                           keyboardType: TextInputType.phone,
                           validator: _validatePhoneNumber,
@@ -756,6 +765,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           maxLength: 10,
                         ),
                       ),
+
+                      // Alt Mobile (optional)
                       _spacedField(
                         TextFormField(
                           controller: _altMobileController,
@@ -775,29 +786,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           maxLength: 10,
                         ),
                       ),
+
+                      // ✅ Date of Birth *
                       _spacedField(
                         TextFormField(
                           controller: _dobController,
                           readOnly: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Date of Birth',
+                          decoration: InputDecoration(
+                            label: _requiredLabel('Date of Birth'),
                           ),
                           onTap: _pickDate,
+                          validator: (value) => value?.isEmpty == true
+                              ? 'Date of birth is required'
+                              : null,
                         ),
                       ),
 
-                      // Only show guardian information if user is under 18
+                      // Guardian fields (only for under 18)
                       if (!_isUserAdult) ...[
                         _spacedField(
                           TextFormField(
                             controller: _guardianNameController,
-                            textCapitalization:
-                                TextCapitalization.words, // Capitalize text
-                            inputFormatters: [
-                              CapitalizeWordsFormatter(), // <-- Added your custom formatter
-                            ],
-                            decoration: const InputDecoration(
-                              labelText: 'Guardian Name',
+                            textCapitalization: TextCapitalization.words,
+                            inputFormatters: [CapitalizeWordsFormatter()],
+                            decoration: InputDecoration(
+                              label: _requiredLabel('Guardian Name'),
                             ),
                             validator: (value) => value?.isEmpty == true
                                 ? 'Guardian name is required'
@@ -837,39 +850,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ),
                       ],
+
+                      // ✅ Address *
                       _spacedField(
                         TextFormField(
                           controller: _addressController,
-                          textCapitalization:
-                              TextCapitalization.words, // Capitalize text
-                          inputFormatters: [
-                            CapitalizeWordsFormatter(), // <-- Added your custom formatter
-                          ],
-                          decoration: const InputDecoration(
-                            labelText: 'Address',
+                          textCapitalization: TextCapitalization.words,
+                          inputFormatters: [CapitalizeWordsFormatter()],
+                          decoration: InputDecoration(
+                            label: _requiredLabel('Flat No / Address'),
                           ),
                           validator: (value) => value?.isEmpty == true
                               ? 'Address is required'
                               : null,
                         ),
                       ),
-                      TextFormField(
-                        controller: _pincodeController,
-                        decoration: const InputDecoration(labelText: 'Pincode'),
-                        keyboardType: TextInputType.number,
-                        validator: _validatePincode,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        maxLength: 6,
 
-                        onChanged: (value) {
-                          if (value.length == 6) {
-                            _hasUserChangedPincode = true; // 🔑 user intent
-                            _fetchAddressFromPincode(value);
-                          }
-                        },
+                      // ✅ Pincode *
+                      _spacedField(
+                        TextFormField(
+                          controller: _pincodeController,
+                          decoration: InputDecoration(
+                            label: _requiredLabel('Pincode'),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: _validatePincode,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          maxLength: 6,
+                          onChanged: (value) {
+                            if (value.length == 6) {
+                              _hasUserChangedPincode = true;
+                              _fetchAddressFromPincode(value);
+                            }
+                          },
+                        ),
                       ),
+
+                      // ✅ City *
                       if (_cities.isNotEmpty)
                         _spacedField(
                           DropdownMenu<String>(
@@ -888,7 +907,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 vertical: 4,
                               ),
                             ),
-                            label: const Text('City'),
+                            label: _requiredLabel('City'),
                             hintText: 'Select City',
                             dropdownMenuEntries: _cities
                                 .map(
@@ -910,6 +929,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ),
 
+                      // ✅ State *
                       if (_states.isNotEmpty)
                         _spacedField(
                           DropdownMenu<String>(
@@ -928,7 +948,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 vertical: 4,
                               ),
                             ),
-                            label: const Text('State'),
+                            label: _requiredLabel('State'),
                             hintText: 'Select State',
                             dropdownMenuEntries: _states
                                 .map(
@@ -950,6 +970,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ),
 
+                      // ✅ Country *
                       if (_countries.isNotEmpty)
                         _spacedField(
                           DropdownMenu<String>(
@@ -970,7 +991,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 vertical: 4,
                               ),
                             ),
-                            label: const Text('Country'),
+                            label: _requiredLabel('Country'),
                             hintText: 'Select Country',
                             dropdownMenuEntries: _countries
                                 .map(
@@ -992,6 +1013,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ),
 
+                      // Social links (optional)
                       _spacedField(
                         TextFormField(
                           controller: _youtubeController,
@@ -1017,6 +1039,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
 
+                      // ✅ Professional Choreographer *
                       _spacedField(
                         DropdownButtonFormField<String>(
                           value:
@@ -1030,27 +1053,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ],
                           onChanged: (val) =>
                               setState(() => _isProfessional = val),
-                          decoration: const InputDecoration(
-                            labelText: 'Are you a professional choreographer?',
+                          decoration: InputDecoration(
+                            label: _requiredLabel(
+                              'Are you a professional choreographer?',
+                            ),
                           ),
+                          validator: (value) => (value == null || value.isEmpty)
+                              ? 'Please select an option'
+                              : null,
                         ),
                       ),
 
+                      // ✅ Experience * (only when Professional = Yes)
                       if (_isProfessional == 'Yes')
                         _spacedField(
                           TextFormField(
                             controller: _experienceController,
-                            decoration: const InputDecoration(
-                              labelText: 'Experience (in years)',
+                            decoration: InputDecoration(
+                              label: _requiredLabel(
+                                'Teaching Experience (in years)',
+                              ),
                             ),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter
-                                  .digitsOnly, // ✅ Only numbers allowed
+                              FilteringTextInputFormatter.digitsOnly,
                             ],
+                            validator: (value) =>
+                                (value == null || value.isEmpty)
+                                ? 'Experience is required'
+                                : null,
                           ),
                         ),
 
+                      // Dance Skills
                       if (!_loadingDropdowns) ...[
                         const SizedBox(height: 16),
                         const Align(
@@ -1067,7 +1102,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ..._skills.asMap().entries.map(
                           (e) => _buildSkillField(e.key),
                         ),
-
                         Align(
                           alignment: Alignment.centerLeft,
                           child: TextButton(
@@ -1087,13 +1121,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     color: Colors.black,
                                   ),
                                 ),
-                                SizedBox(
-                                  width: 6,
-                                ), // spacing between text and icon
+                                SizedBox(width: 6),
                                 Icon(
                                   Icons.add_circle,
                                   color: Color(0xFF3A5ED4),
-                                  size: 26, // 🔥 bigger icon
+                                  size: 26,
                                 ),
                               ],
                             ),
