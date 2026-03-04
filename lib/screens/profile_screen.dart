@@ -763,24 +763,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         return GestureDetector(
           onTap: () async {
-            // ✅ Show loading indicator
             showDialog(
               context: context,
               barrierDismissible: false,
-              builder: (context) =>
-                  const Center(child: CircularProgressIndicator()),
+              builder: (_) => const Center(child: CircularProgressIndicator()),
             );
 
             try {
+              final batchId = batch['batchId'] is Map
+                  ? batch['batchId']['_id']
+                  : batch['batchId'];
+
               final response = await http.get(
-                Uri.parse('$baseUrl/api/batches/${batch['batchId']}'),
+                Uri.parse('$baseUrl/api/batches'),
               );
 
-              // ✅ Close loading dialog
-              Navigator.pop(context);
+              Navigator.pop(context); // close loading dialog
 
               if (response.statusCode == 200) {
-                final batchData = jsonDecode(response.body);
+                final List data = jsonDecode(response.body);
+
+                final batchData = data.cast<Map<String, dynamic>>().firstWhere(
+                  (b) => b['_id'] == batchId,
+                  orElse: () => {},
+                );
+
+                if (batchData.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Batch not found'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
                 final batchModel = BatchModel.fromJson(batchData);
 
                 final branchModel = BranchModel(
@@ -802,7 +819,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 );
               } else {
-                // ✅ Show error message
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Failed to load batch details'),
@@ -811,10 +827,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }
             } catch (e) {
-              // ✅ Close loading dialog
               Navigator.pop(context);
-
-              // ✅ Show error message
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Error: $e'),

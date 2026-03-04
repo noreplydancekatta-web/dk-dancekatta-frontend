@@ -108,19 +108,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+
+              // 👇 ADD THIS PART
               actions: [
                 Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: IconButton(
-                    icon: CircleAvatar(
-                      radius: 20,
-                      backgroundColor: Colors.grey[200],
-                      backgroundImage: _getProfileImage(_currentUser),
-                      child: _getProfileImage(_currentUser) == null
-                          ? const Icon(Icons.person, color: Colors.grey)
-                          : null,
-                    ),
-                    onPressed: _navigateToProfile,
+                  padding: const EdgeInsets.only(right: 12),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundImage:
+                        _currentUser.profilePhoto != null &&
+                            _currentUser.profilePhoto!.isNotEmpty
+                        ? NetworkImage(_currentUser.profilePhoto!)
+                        : null,
+                    child:
+                        _currentUser.profilePhoto == null ||
+                            _currentUser.profilePhoto!.isEmpty
+                        ? const Icon(Icons.person, size: 20)
+                        : null,
                   ),
                 ),
               ],

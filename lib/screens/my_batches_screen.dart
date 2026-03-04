@@ -128,15 +128,15 @@ class _MyBatchesScreenState extends State<MyBatchesScreen> {
             errorMsg = decoded['message'];
           }
         } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMsg)));
       }
     } catch (e) {
       debugPrint('Error submitting rating: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error submitting rating')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error submitting rating')));
     }
   }
 
@@ -160,9 +160,7 @@ class _MyBatchesScreenState extends State<MyBatchesScreen> {
   }
 
   Future<Map<String, dynamic>> fetchOwner(String ownerId) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/users/$ownerId'),
-    );
+    final response = await http.get(Uri.parse('$baseUrl/api/users/$ownerId'));
     if (response.statusCode == 200) return jsonDecode(response.body);
     throw Exception('Failed to fetch owner');
   }
@@ -189,8 +187,10 @@ class _MyBatchesScreenState extends State<MyBatchesScreen> {
     final double tutorFee = _parseDouble(txn['fee']);
     final double discountAmount = _parseDouble(txn['discountAmount']);
     final double discountedTutorFee = tutorFee - discountAmount;
-    final double platformPercent =
-        _parseDouble(platformFeeData?['feePercent'], 0);
+    final double platformPercent = _parseDouble(
+      platformFeeData?['feePercent'],
+      0,
+    );
     final double gstPercent = _parseDouble(platformFeeData?['gstPercent'], 0);
     final double platformFee = (discountedTutorFee * platformPercent) / 100;
     final double gstOnPlatformFee = (platformFee * gstPercent) / 100;
@@ -439,9 +439,7 @@ class _MyBatchesScreenState extends State<MyBatchesScreen> {
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text(
-                            'GST ${gstPercent.toStringAsFixed(0)}%',
-                          ),
+                          pw.Text('GST ${gstPercent.toStringAsFixed(0)}%'),
                           pw.Text('₹${gstOnPlatformFee.toStringAsFixed(2)}'),
                         ],
                       ),
@@ -516,190 +514,211 @@ class _MyBatchesScreenState extends State<MyBatchesScreen> {
       child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : enrolledBatches.isEmpty
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 200),
-                    Center(child: Text('No enrolled batches')),
-                  ],
-                )
-              : ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(12),
-                  itemCount: enrolledBatches.length,
-                  itemBuilder: (context, index) {
-                    final batch = enrolledBatches[index];
-                    final isRated =
-                        ratedBatchIds.contains(batch['batchId'] as String? ?? '');
-                    final isEnded =
-                        DateTime.tryParse(batch['toDate'] ?? '')
-                            ?.isBefore(DateTime.now()) ??
-                        false;
-                    final statusText = isEnded ? 'Ended' : 'Active';
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [
+                SizedBox(height: 200),
+                Center(child: Text('No enrolled batches')),
+              ],
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(12),
+              itemCount: enrolledBatches.length,
+              itemBuilder: (context, index) {
+                final batch = enrolledBatches[index];
+                final isRated = ratedBatchIds.contains(
+                  batch['batchId'] as String? ?? '',
+                );
+                final isEnded =
+                    DateTime.tryParse(
+                      batch['toDate'] ?? '',
+                    )?.isBefore(DateTime.now()) ??
+                    false;
+                final statusText = isEnded ? 'Ended' : 'Active';
 
-                    return GestureDetector(
-                      onTap: () async {
-                        // ✅ Show loading
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) => const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
+                return GestureDetector(
+                  onTap: () async {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) =>
+                          const Center(child: CircularProgressIndicator()),
+                    );
 
-                        try {
-                          final response = await http.get(
-                            Uri.parse(
-                              '$baseUrl/api/batches/${batch['batchId']}',
-                            ),
-                          );
+                    try {
+                      final batchId = batch['batchId'] is Map
+                          ? batch['batchId']['_id']
+                          : batch['batchId'];
 
-                          Navigator.pop(context); // close loading
+                      final response = await http.get(
+                        Uri.parse('$baseUrl/api/batches'),
+                      );
 
-                          if (response.statusCode == 200) {
-                            final batchData = jsonDecode(response.body);
-                            final batchModel = BatchModel.fromJson(batchData);
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      } // close loading
 
-                            final branchModel = BranchModel(
-                              id: batchModel.branch,
-                              name: batch['branchName'] ?? 'Unknown Branch',
-                              address: batch['branchAddress'] ??
-                                  'Address not available',
-                              area: '',
-                              contactNo: batch['branchContactNo'] ?? '',
-                              mapLink: '',
+                      if (response.statusCode == 200) {
+                        final List data = jsonDecode(response.body);
+
+                        final batchData = data
+                            .cast<Map<String, dynamic>>()
+                            .firstWhere(
+                              (b) => b['_id'] == batchId,
+                              orElse: () => {},
                             );
 
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => BatchDetailScreen(
-                                  batch: batchModel,
-                                  branch: branchModel,
-                                ),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Failed to load batch details'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          Navigator.pop(context); // close loading
+                        if (batchData.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error: $e'),
+                            const SnackBar(
+                              content: Text('Batch not found'),
                               backgroundColor: Colors.red,
                             ),
                           );
+                          return;
                         }
-                      },
 
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
+                        final batchModel = BatchModel.fromJson(batchData);
+
+                        final branchModel = BranchModel(
+                          id: batchModel.branch,
+                          name: batch['branchName'] ?? 'Unknown Branch',
+                          address:
+                              batch['branchAddress'] ?? 'Address not available',
+                          area: '',
+                          contactNo: batch['branchContactNo'] ?? '',
+                          mapLink: '',
+                        );
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => BatchDetailScreen(
+                              batch: batchModel,
+                              branch: branchModel,
+                            ),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Failed to load batch details'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red,
                         ),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              blurRadius: 6,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ✅ Title + Status
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  "${batch['style']} • ${batch['level']}",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  statusText,
-                                  style: TextStyle(
-                                    color: isEnded
-                                        ? Colors.black
-                                        : Colors.blueAccent,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-
-                            // ✅ Studio name
-                            Text(batch['studioName'] ?? 'Studio'),
-
-                            // ✅ Payment
-                            Text(
-                              "Payment Successful ₹${batch['paymentAmount'] ?? '0'}/-",
-                            ),
-                            const SizedBox(height: 6),
-
-                            // ✅ Rating + Invoice
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // Rating stars or rated check
-                                if (isEnded)
-                                  isRated
-                                      ? const Text("⭐ You rated this batch")
-                                      : RatingBar.builder(
-                                          initialRating: 0,
-                                          minRating: 1,
-                                          direction: Axis.horizontal,
-                                          itemSize: 26,
-                                          itemCount: 5,
-                                          allowHalfRating: false,
-                                          itemBuilder: (context, _) =>
-                                              const Icon(
-                                            Icons.star,
-                                            color: Colors.amber,
-                                          ),
-                                          onRatingUpdate: (rating) {
-                                            submitRating(
-                                              batch['studioId'].toString(),
-                                              batch['batchId'].toString(),
-                                              rating,
-                                            );
-                                          },
-                                        )
-                                else
-                                  const SizedBox(),
-
-                                // ✅ Invoice download
-                                IconButton(
-                                  icon: const Icon(Icons.download, size: 22),
-                                  onPressed: () async {
-                                    final studioData = await fetchStudioById(
-                                      batch['studioId'],
-                                    );
-                                    await generateInvoice(batch, studioData);
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                      );
+                    }
                   },
-                ),
+
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          blurRadius: 6,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ✅ Title + Status
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "${batch['style']} • ${batch['level']}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              statusText,
+                              style: TextStyle(
+                                color: isEnded
+                                    ? Colors.black
+                                    : Colors.blueAccent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+
+                        // ✅ Studio name
+                        Text(batch['studioName'] ?? 'Studio'),
+
+                        // ✅ Payment
+                        Text(
+                          "Payment Successful ₹${batch['paymentAmount'] ?? '0'}/-",
+                        ),
+                        const SizedBox(height: 6),
+
+                        // ✅ Rating + Invoice
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Rating stars or rated check
+                            if (isEnded)
+                              isRated
+                                  ? const Text("⭐ You rated this batch")
+                                  : RatingBar.builder(
+                                      initialRating: 0,
+                                      minRating: 1,
+                                      direction: Axis.horizontal,
+                                      itemSize: 26,
+                                      itemCount: 5,
+                                      allowHalfRating: false,
+                                      itemBuilder: (context, _) => const Icon(
+                                        Icons.star,
+                                        color: Colors.amber,
+                                      ),
+                                      onRatingUpdate: (rating) {
+                                        submitRating(
+                                          batch['studioId'].toString(),
+                                          batch['batchId'].toString(),
+                                          rating,
+                                        );
+                                      },
+                                    )
+                            else
+                              const SizedBox(),
+
+                            // ✅ Invoice download
+                            IconButton(
+                              icon: const Icon(Icons.download, size: 22),
+                              onPressed: () async {
+                                final studioData = await fetchStudioById(
+                                  batch['studioId'],
+                                );
+                                await generateInvoice(batch, studioData);
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }

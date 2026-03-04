@@ -29,7 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   bool isLoading = false;
 
-
   // Initialize Firebase and Google Sign-In instances
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
@@ -74,23 +73,21 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Something went wrong.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Something went wrong.')));
     } finally {
       setState(() => isLoading = false);
     }
   }
 
-
   Future<void> _handleGoogleSignIn() async {
     setState(() => isLoading = true);
 
     try {
+      await _googleSignIn.signOut(); // clear previous
+      await _auth.signOut();
       // 🔹 Reset GoogleSignIn and FirebaseAuth state
-      await _googleSignIn.disconnect().catchError((_) {});
-      await _googleSignIn.signOut().catchError((_) {});
-      await _auth.signOut().catchError((_) {});
 
       // 🔹 Begin the Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -101,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // 🔹 Get authentication details
       final GoogleSignInAuthentication googleAuth =
-      await googleUser.authentication;
+          await googleUser.authentication;
 
       if (googleAuth.idToken == null || googleAuth.accessToken == null) {
         throw Exception("Missing Google ID token or access token");
@@ -113,69 +110,76 @@ class _LoginScreenState extends State<LoginScreen> {
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential =
-      await _auth.signInWithCredential(credential);
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
       final User? firebaseUser = userCredential.user;
+      String? photoUrl = firebaseUser?.photoURL;
+      print("Google Photo URL: $photoUrl");
 
       if (firebaseUser == null) {
         throw Exception("Firebase user is null");
       }
 
       // 🔹 Call backend (check or create user automatically)
-      try {
-        final response = await http.post(
-          Uri.parse("http://147.93.19.17:5002/api/users/check-google"),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode({
-            "email": firebaseUser.email,
-            "name": firebaseUser.displayName,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-
-          // ✅ Always take user object, ignore "exists"
-          final userModel = UserModel.fromJson(data["user"]);
-
-          // 🚨 Check if disabled
-          if (userModel.status == "Disabled") {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  "This account has been disabled by the admin. Please try another email or contact support.",
-                ),
-                backgroundColor: Colors.red,
-              ),
-            );
-            return; // stop login
-          }
-
-          await SessionManager.saveUserSession(userModel.id ?? '');
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => HomeScreen(user: userModel)),
-          );
-        } else {
-          throw Exception("Google Sign-In failed: ${response.body}");
-        }
-      } catch (e) {
-        print("Error during Google Sign-In backend check: $e");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google Sign-In failed: $e')),
-        );
-      }
-    } catch (e, s) {
-      print("Google Sign-In error: $e\n$s");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google Sign-In failed: $e')),
+      final response = await http.post(
+        Uri.parse("http://147.93.19.17:5002/api/users/check-google"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": firebaseUser.email,
+          "name": firebaseUser.displayName,
+          "photo": firebaseUser.photoURL,
+        }),
       );
+
+      if (response.statusCode != 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Server error: ${response.statusCode}")),
+        );
+        return;
+      }
+
+      if (response.body.isEmpty) {
+        throw Exception("Empty server response");
+      }
+
+      final data = jsonDecode(response.body);
+      final userData = data["user"] ?? data;
+
+      if (userData == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Invalid server response")),
+        );
+        return;
+      }
+
+      final userModel = UserModel.fromJson(userData);
+
+      if (userModel.status == "Disabled") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Account disabled by admin."),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      await SessionManager.saveUserSession(userModel.id ?? '');
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen(user: userModel)),
+      );
+    } catch (e) {
+      print("Google Sign-In error: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Google Sign-In failed")));
     } finally {
       setState(() => isLoading = false);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

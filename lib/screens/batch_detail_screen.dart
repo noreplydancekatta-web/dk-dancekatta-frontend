@@ -154,10 +154,13 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        transaction = data.cast<Map<String, dynamic>>().firstWhere(
-          (txn) => txn['batchId'] == widget.batch.id,
-          orElse: () => {},
-        );
+        transaction = data.cast<Map<String, dynamic>>().firstWhere((txn) {
+          final txnBatchId = txn['batchId'] is Map
+              ? txn['batchId']['_id']
+              : txn['batchId'];
+
+          return txnBatchId == widget.batch.id;
+        }, orElse: () => {});
 
         if (transaction!.isEmpty) {
           transaction = null;

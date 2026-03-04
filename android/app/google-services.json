@@ -1,41 +1,41 @@
 {
   "project_info": {
-    "project_number": "376921625457",
-    "project_id": "dancekatta-218",
-    "storage_bucket": "dancekatta-218.firebasestorage.app"
+    "project_number": "451256532929",
+    "project_id": "dancekatta-ef960",
+    "storage_bucket": "dancekatta-ef960.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:376921625457:android:12b197cf02e72efdfa9cd0",
+        "mobilesdk_app_id": "1:451256532929:android:4bae19c8d1ace900b0f940",
         "android_client_info": {
           "package_name": "com.example.dancekatta"
         }
       },
       "oauth_client": [
         {
-          "client_id": "376921625457-2etjcc4cb0tn49s5o9mofinvbrciv1cf.apps.googleusercontent.com",
+          "client_id": "451256532929-9hd4ph11omncsjgrbrfpcteddm5cl168.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.dancekatta",
-            "certificate_hash": "e4cecc6e7b84d89baeb0d646ceb027fd255b035d"
+            "certificate_hash": "e038c8061ecb08f4ed853d09975c3a83eff0c11e"
           }
         },
         {
-          "client_id": "376921625457-0r91q4fpbqhbop85g7gtpo4k4pei34ct.apps.googleusercontent.com",
+          "client_id": "451256532929-449krbvobuqinb7vm6s3vcrnle8f3lv1.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyDEQQKayq4PGWkyfOt3iBHe5NHx0CntJSM"
+          "current_key": "AIzaSyAcUP58QeQjeyBZ8QFQY94YbgUc5CIZDto"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "376921625457-0r91q4fpbqhbop85g7gtpo4k4pei34ct.apps.googleusercontent.com",
+              "client_id": "451256532929-449krbvobuqinb7vm6s3vcrnle8f3lv1.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

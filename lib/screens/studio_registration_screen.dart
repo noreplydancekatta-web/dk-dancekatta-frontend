@@ -19,7 +19,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:flutter/gestures.dart';
 import 'package:mime/mime.dart';
-import 'package:http_parser/http_parser.dart';
 
 class StudioRegistrationScreen extends StatefulWidget {
   final UserModel user;
@@ -235,14 +234,14 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
     });
 
     try {
-      // // 1️⃣ Validate required images
-      // if (_logoFile == null) throw Exception('Please upload a studio logo');
-      // if (_aadharFrontPath == null || _aadharBackPath == null) {
-      //   throw Exception('Please upload both Aadhaar front and back photos');
-      // }
-      // if (_studioPhotos.isEmpty || _studioPhotos.length < 5) {
-      //   throw Exception('Please upload at least 5 studio photos');
-      // }
+      // 1️⃣ Validate required images
+      if (_logoFile == null) throw Exception('Please upload a studio logo');
+      if (_aadharFrontPath == null || _aadharBackPath == null) {
+        throw Exception('Please upload both Aadhaar front and back photos');
+      }
+      if (_studioPhotos.isEmpty || _studioPhotos.length < 5) {
+        throw Exception('Please upload at least 5 studio photos');
+      }
 
       // 2️⃣ Get current location
       Position position = await Geolocator.getCurrentPosition(
@@ -318,40 +317,40 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
       // 🔹 Upload images one by one
       // ---------------------------
 
-      // // ✅ Upload logo
-      // final logoPath = await _uploadSingleImage(
-      //   File(_logoFile!.path),
-      //   "http://147.93.19.17:5002/api/studios/logo",
-      //   "image",
-      // );
-      // if (logoPath == null) throw Exception("Logo upload failed!");
+      // ✅ Upload logo
+      final logoPath = await _uploadSingleImage(
+        File(_logoFile!.path),
+        "http://147.93.19.17:5002/api/studios/logo",
+        "image",
+      );
+      if (logoPath == null) throw Exception("Logo upload failed!");
 
-      // // ✅ Aadhaar front
-      // final aadharFrontPath = await _uploadSingleImage(
-      //   File(_aadharFrontPath!),
-      //   "http://147.93.19.17:5002/api/studios/aadhar-front",
-      //   "image",
-      // );
-      // if (aadharFrontPath == null)
-      //   throw Exception("Aadhaar front upload failed!");
+      // ✅ Aadhaar front
+      final aadharFrontPath = await _uploadSingleImage(
+        File(_aadharFrontPath!),
+        "http://147.93.19.17:5002/api/studios/aadhar-front",
+        "image",
+      );
+      if (aadharFrontPath == null)
+        throw Exception("Aadhaar front upload failed!");
 
-      // // ✅ Aadhaar back
-      // final aadharBackPath = await _uploadSingleImage(
-      //   File(_aadharBackPath!),
-      //   "http://147.93.19.17:5002/api/studios/aadhar-back",
-      //   "image",
-      // );
-      // if (aadharBackPath == null)
-      //   throw Exception("Aadhaar back upload failed!");
+      // ✅ Aadhaar back
+      final aadharBackPath = await _uploadSingleImage(
+        File(_aadharBackPath!),
+        "http://147.93.19.17:5002/api/studios/aadhar-back",
+        "image",
+      );
+      if (aadharBackPath == null)
+        throw Exception("Aadhaar back upload failed!");
 
-      // // ✅ Studio images
-      // final studioPhotoPaths = await _uploadMultipleImages(
-      //   _studioPhotos.map((p) => File(p)).toList(),
-      //   "http://147.93.19.17:5002/api/studios/images",
-      //   "images",
-      // );
-      // if (studioPhotoPaths.length < 5)
-      //   throw Exception("Studio images upload failed!");
+      // ✅ Studio images
+      final studioPhotoPaths = await _uploadMultipleImages(
+        _studioPhotos.map((p) => File(p)).toList(),
+        "http://147.93.19.17:5002/api/studios/images",
+        "images",
+      );
+      if (studioPhotoPaths.length < 5)
+        throw Exception("Studio images upload failed!");
 
       // ---------------------------
       // 🔹 Prepare registration data
@@ -373,10 +372,10 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
         "studioInstagram": _instagramController.text,
 
         // ✅ Uploaded image paths
-        // "logoUrl": logoPath,
-        // "aadharFrontPhoto": aadharFrontPath,
-        // "aadharBackPhoto": aadharBackPath,
-        // "studioPhotos": studioPhotoPaths,
+        "logoUrl": logoPath,
+        "aadharFrontPhoto": aadharFrontPath,
+        "aadharBackPhoto": aadharBackPath,
+        "studioPhotos": studioPhotoPaths,
 
         "createdAt": DateTime.now().toIso8601String(),
         "updatedAt": DateTime.now().toIso8601String(),
