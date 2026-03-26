@@ -7,6 +7,9 @@ import 'explore_tab.dart';
 import 'messages_screen.dart';
 import '../constants.dart'; // ✅ import for getFullImageUrl
 import 'my_batches_screen.dart';
+import 'dart:async';
+import '../services/announcement_service.dart';
+import '../services/inbox_service.dart';
 
 // Global ValueNotifier to manage the state of new messages
 final ValueNotifier<bool> hasNewMessages = ValueNotifier<bool>(false);
@@ -25,16 +28,21 @@ class _HomeScreenState extends State<HomeScreen> {
   late UserModel _currentUser;
   late List<Widget> _tabs;
 
-  /// Returns an ImageProvider for the profile image
   ImageProvider? _getProfileImage(UserModel user) {
-    final url = getFullImageUrl(user.profilePhoto); // ✅ use shared helper
+    final photoUrl = user.profilePhoto;
 
-    if (url.isNotEmpty) {
-      return NetworkImage(url);
+    // If photo URL is null or empty, return null
+    if (photoUrl == null || photoUrl.isEmpty) {
+      return null;
     }
 
-    // Fallback → no image
-    return null;
+    // If already a full URL (from Google Sign-In)
+    if (photoUrl.startsWith('http')) {
+      return NetworkImage(photoUrl);
+    }
+
+    // Otherwise, treat as relative path from backend
+    return NetworkImage('http://147.93.19.17:5002$photoUrl');
   }
 
   void _navigateToProfile() async {
@@ -75,6 +83,41 @@ class _HomeScreenState extends State<HomeScreen> {
       MyBatchesScreen(user: _currentUser),
       MessagesScreen(user: _currentUser),
     ];
+
+    // ← ADD THIS
+    _startMessagePolling();
+  }
+
+  Timer? _messageCheckTimer;
+
+  void _startMessagePolling() async {
+    // Check immediately on startup
+    await _checkUnseenMessages();
+
+    // Then check every 30 seconds
+    _messageCheckTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _checkUnseenMessages(),
+    );
+  }
+
+  Future<void> _checkUnseenMessages() async {
+    try {
+      final announcements = await AnnouncementService.fetchAnnouncements();
+      final seenIds = await InboxService.fetchSeenAnnouncementIds(
+        _currentUser.id!,
+      );
+      final hasUnseen = announcements.any((a) => !seenIds.contains(a.id));
+      hasNewMessages.value = hasUnseen; // ← this triggers the red dot
+    } catch (e) {
+      debugPrint('❌ Error checking messages: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _messageCheckTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -113,18 +156,20 @@ class _HomeScreenState extends State<HomeScreen> {
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundImage:
-                        _currentUser.profilePhoto != null &&
-                            _currentUser.profilePhoto!.isNotEmpty
-                        ? NetworkImage(_currentUser.profilePhoto!)
-                        : null,
-                    child:
-                        _currentUser.profilePhoto == null ||
-                            _currentUser.profilePhoto!.isEmpty
-                        ? const Icon(Icons.person, size: 20)
-                        : null,
+                  child: GestureDetector(
+                    onTap: _navigateToProfile,
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.grey[200],
+                      backgroundImage: _getProfileImage(_currentUser),
+                      child: _getProfileImage(_currentUser) == null
+                          ? const Icon(
+                              Icons.person,
+                              size: 20,
+                              color: Colors.grey,
+                            )
+                          : null,
+                    ),
                   ),
                 ),
               ],

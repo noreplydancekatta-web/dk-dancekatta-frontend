@@ -473,7 +473,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.only(
-                        top: 60,
+                        top: 20,
                         bottom: 40,
                         left: 24,
                         right: 24,
@@ -489,6 +489,33 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                         crossAxisAlignment:
                             CrossAxisAlignment.start, // left align text
                         children: [
+                          // 🔙 Back button with title
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Create Studio Profile',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 20,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
                           Text(
                             'Welcome to',
                             style: GoogleFonts.poppins(
@@ -1049,7 +1076,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
 
                           GridView.builder(
                             shrinkWrap: true,
-                            itemCount: _studioPhotos.length < 6
+                            itemCount: _studioPhotos.length < 5
                                 ? _studioPhotos.length + 1
                                 : 6,
                             physics: const NeverScrollableScrollPhysics(),

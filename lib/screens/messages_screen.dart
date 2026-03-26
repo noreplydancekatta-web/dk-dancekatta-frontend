@@ -4,6 +4,7 @@ import '../services/announcement_service.dart';
 import '../services/inbox_service.dart';
 import '../models/user_model.dart';
 import 'home_screen.dart';
+import 'dart:async';
 
 class MessagesScreen extends StatefulWidget {
   final UserModel user;
@@ -17,11 +18,27 @@ class MessagesScreen extends StatefulWidget {
 class _MessagesScreenState extends State<MessagesScreen> {
   late Future<List<Announcement>> _announcementsFuture;
   List<Announcement> _announcements = [];
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _announcementsFuture = _loadAnnouncements();
+
+    // Auto-refresh every 30 seconds
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        setState(() {
+          _announcementsFuture = _loadAnnouncements();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<List<Announcement>> _loadAnnouncements() async {
@@ -31,25 +48,25 @@ class _MessagesScreenState extends State<MessagesScreen> {
         widget.user.id!,
       );
 
-      // Tag each announcement as seen/unseen
       for (var a in announcements) {
         a.isSeen = seenIds.contains(a.id);
       }
 
-      // After rendering the blue cards, mark all unseen as seen
+      // ✅ This block already exists — just add the ONE new line inside it
       Future.delayed(Duration.zero, () async {
         for (var a in announcements) {
           if (!a.isSeen) {
             await InboxService.markAsSeen(widget.user.id!, a.id);
-            print("✅ Marked as seen: ${a.id}");
+            debugPrint("✅ Marked as seen: ${a.id}");
           }
         }
+        hasNewMessages.value = false; // ← ADD THIS LINE HERE
       });
 
       _announcements = announcements;
       return announcements;
     } catch (e) {
-      print("❌ Error loading announcements: $e");
+      debugPrint('❌ Error loading announcements: $e');
       rethrow;
     }
   }
@@ -98,10 +115,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 6),
-          const Text(
-            "The Dance Studio - Step Up Zumba",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
+
           const SizedBox(height: 6),
           Text(a.message),
           const SizedBox(height: 10),

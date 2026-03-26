@@ -57,13 +57,11 @@ class _LoginScreenState extends State<LoginScreen> {
         // ✅ Check if email already exists in DB
         final isRegistered = await _authService.isEmailRegistered(email);
 
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => LoginWithOTPScreen(
-              email: email,
-              isNewUser: !isRegistered, // pass flag
-            ),
+            builder: (context) =>
+                LoginWithOTPScreen(email: email, isNewUser: !isRegistered),
           ),
         );
       } else {
@@ -85,9 +83,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = true);
 
     try {
-      await _googleSignIn.signOut(); // clear previous
-      await _auth.signOut();
       // 🔹 Reset GoogleSignIn and FirebaseAuth state
+      await _googleSignIn.disconnect().catchError((_) {});
+      await _googleSignIn.signOut().catchError((_) {});
+      await _auth.signOut().catchError((_) {});
 
       // 🔹 Begin the Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -114,68 +113,55 @@ class _LoginScreenState extends State<LoginScreen> {
         credential,
       );
       final User? firebaseUser = userCredential.user;
-      String? photoUrl = firebaseUser?.photoURL;
-      print("Google Photo URL: $photoUrl");
 
       if (firebaseUser == null) {
         throw Exception("Firebase user is null");
       }
-
+      final photoUrl = firebaseUser.photoURL;
       // 🔹 Call backend (check or create user automatically)
-      final response = await http.post(
-        Uri.parse("http://147.93.19.17:5002/api/users/check-google"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": firebaseUser.email,
-          "name": firebaseUser.displayName,
-          "photo": firebaseUser.photoURL,
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Server error: ${response.statusCode}")),
+      try {
+        final response = await http.post(
+          Uri.parse("http://147.93.19.17:5002/api/users/check-google"),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "email": firebaseUser.email,
+            "name": firebaseUser.displayName,
+            "photoURL": photoUrl, // ✅ ADD THIS
+          }),
         );
-        return;
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final data = jsonDecode(response.body);
+
+          final userModel = UserModel.fromJson(data["user"]);
+
+          if (userModel.status == "Disabled") {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("This account has been disabled.")),
+            );
+            return;
+          }
+
+          await SessionManager.saveUserSession(userModel.id ?? '');
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomeScreen(user: userModel)),
+          );
+        } else {
+          throw Exception("Google Sign-In failed: ${response.body}");
+        }
+      } catch (e) {
+        print("Error during Google Sign-In backend check: $e");
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
       }
-
-      if (response.body.isEmpty) {
-        throw Exception("Empty server response");
-      }
-
-      final data = jsonDecode(response.body);
-      final userData = data["user"] ?? data;
-
-      if (userData == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Invalid server response")),
-        );
-        return;
-      }
-
-      final userModel = UserModel.fromJson(userData);
-
-      if (userModel.status == "Disabled") {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Account disabled by admin."),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      await SessionManager.saveUserSession(userModel.id ?? '');
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomeScreen(user: userModel)),
-      );
-    } catch (e) {
-      print("Google Sign-In error: $e");
+    } catch (e, s) {
+      print("Google Sign-In error: $e\n$s");
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Google Sign-In failed")));
+      ).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
     } finally {
       setState(() => isLoading = false);
     }
