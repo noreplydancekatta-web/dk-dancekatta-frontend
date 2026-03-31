@@ -19,16 +19,15 @@ class CouponModel {
 
   factory CouponModel.fromJson(Map<String, dynamic> json) {
     return CouponModel(
-      couponCode: json['CouponCode']?.toString() ?? '',
+      couponCode: json['couponCode']?.toString() ?? '',
       isActive: json['isActive'] ?? false,
-      startDate: DateTime.tryParse(json['StartDate'] ?? '') ?? DateTime(2000),
-      expiryDate: DateTime.tryParse(json['ExpiryDate'] ?? '') ?? DateTime(2100),
-      couponType: json['CouponType']?.toString() ?? 'PlatformWide',
-      studioId: json['StudioID']?.toString(),
-      discountPercent: (json['DiscountPercent'] ?? 0).toInt(),
+      startDate: DateTime.tryParse(json['startDate'] ?? '') ?? DateTime(2000),
+      expiryDate: DateTime.tryParse(json['expiryDate'] ?? '') ?? DateTime(2100),
+      couponType: json['couponType']?.toString() ?? 'PlatformWide',
+      studioId: json['studioID']?.toString(),
+      discountPercent: (json['discountPercent'] ?? 0).toInt(),
     );
   }
-
   factory CouponModel.empty() => CouponModel(
     couponCode: '',
     isActive: false,

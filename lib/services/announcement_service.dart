@@ -1,12 +1,14 @@
+//final updated
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/announcement_model.dart';
 
 class AnnouncementService {
-  static Future<List<Announcement>> fetchAnnouncements() async {
+  static Future<List<Announcement>> fetchAnnouncements(String userId) async {
     try {
       final response = await http.get(
-        Uri.parse('http://147.93.19.17:5002/api/announcements'),
+        // ✅ Correct backend URL
+        Uri.parse('http://147.93.19.17:5002/api/announcements/student/$userId'),
       );
 
       print('📢 Announcements GET Code: ${response.statusCode}');

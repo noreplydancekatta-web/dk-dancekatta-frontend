@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/studio_model.dart';
-import '../models/user_model.dart'; // âœ… Added import
+import '../models/user_model.dart';
 import '../database/mongodb_connection.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo;
 import 'studio_success_screen.dart';
@@ -37,12 +37,8 @@ class FirstLetterCapitalizer extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     if (newValue.text.isEmpty) return newValue;
-
     String text = newValue.text;
-
-    // Capitalize first character only
     String capitalized = text[0].toUpperCase() + text.substring(1);
-
     return newValue.copyWith(text: capitalized, selection: newValue.selection);
   }
 }
@@ -50,27 +46,23 @@ class FirstLetterCapitalizer extends TextInputFormatter {
 class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _pageController = PageController();
-  String? _logoPath; // will hold relative URL returned by backend
+
+  String? _logoPath;
   File? _logoFile;
   final ImagePicker _picker = ImagePicker();
+
   String? _aadharFrontPath;
   String? _aadharBackPath;
   final List<String> _studioPhotos = [];
+
   bool _termsAccepted = false;
-
-  // âœ… Add this function here, outside build()
-  void openTerms() async {
-    const url = 'https://dancekatta.com/terms-of-service/';
-    if (!await launchUrlString(
-      url,
-      mode: LaunchMode.externalApplication, // opens in browser
-    )) {
-      debugPrint('Could not launch $url');
-    }
-  }
-
   bool _isSubmitting = false;
-  String? _createdStudioId; // Store studio ID after registration
+  String? _createdStudioId;
+
+  // ── Upload progress tracking ──────────────────────────────────
+  String _uploadStatus = '';
+  int _uploadedCount = 0;
+  int _totalToUpload = 0;
 
   final _studioNameController = TextEditingController();
   final _addressController = TextEditingController();
@@ -87,117 +79,155 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
   final _youtubeController = TextEditingController();
   final _instagramController = TextEditingController();
 
-  /// Validate phone number (10 digits)
-  String? _validatePhoneNumber(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Phone number is required';
-    }
-    if (value.length != 10) {
-      return 'Phone number must be 10 digits';
-    }
-    if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
-      return 'Phone number must contain only digits';
-    }
-    return null;
+  // ─────────────────────────────────────────────────────────────
+  // 📷 Reusable bottom sheet: Camera or Gallery
+  // ─────────────────────────────────────────────────────────────
+  Future<ImageSource?> _showImageSourceSheet({
+    String title = 'Select Image Source',
+  }) {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF3A5ED4),
+                  child: Icon(Icons.camera_alt, color: Colors.white),
+                ),
+                title: const Text('Take a Photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF3A5ED4),
+                  child: Icon(Icons.photo_library, color: Colors.white),
+                ),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  /// Validate email format
-  String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Email is required';
-    }
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-      return 'Please enter a valid email';
-    }
-    return null;
-  }
-
-  /// Validate PAN number (10 characters: 5 letters + 4 digits + 1 letter)
-  String? _validatePAN(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'PAN number is required';
-    }
-    if (value.length != 10) {
-      return 'PAN number must be 10 characters';
-    }
-    if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(value.toUpperCase())) {
-      return 'PAN format: ABCDE1234F (5 letters + 4 digits + 1 letter)';
-    }
-    return null;
-  }
-
-  /// Validate GST number (15 characters: 2 digits + 10 characters + 3 digits)
-  String? _validateGST(String? value) {
-    if (value == null || value.isEmpty) {
-      return null; // GST is optional
-    }
-    if (value.length != 15) {
-      return 'GST number must be 15 characters';
-    }
-    if (!RegExp(
-      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
-    ).hasMatch(value.toUpperCase())) {
-      return 'GST format: 22AAAAA0000A1Z5 (2 digits + 5 letters + 4 digits + 1 letter + 1 digit/letter + Z + 1 digit/letter)';
-    }
-    return null;
-  }
-
-  /// Validate IFSC code (11 characters: 4 letters + 7 digits)
-  String? _validateIFSC(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'IFSC code is required';
-    }
-    if (value.length != 11) {
-      return 'IFSC code must be 11 characters';
-    }
-    if (!RegExp(r'^[A-Z]{4}[0-9]{7}$').hasMatch(value.toUpperCase())) {
-      return 'IFSC format: ABCD0001234 (4 letters + 7 digits)';
-    }
-    return null;
-  }
-
-  /// Validate bank account number (9-18 digits)
-  String? _validateBankAccount(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Bank account number is required';
-    }
-    if (value.length < 9 || value.length > 18) {
-      return 'Bank account number must be 9-18 digits';
-    }
-    if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
-      return 'Bank account number must contain only digits';
-    }
-    return null;
-  }
-
-  /// Validate required fields
-  String? _validateRequired(String? value, String fieldName) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName is required';
-    }
-    return null;
-  }
-
-  bool _isValidUrl(String url, {List<String>? requiredPatterns}) {
-    if (url.isEmpty) return true; // Optional fields
-    try {
-      final uri = Uri.parse(url);
-      if (!uri.hasAbsolutePath) return false;
-      if (requiredPatterns != null) {
-        return requiredPatterns.any((pattern) => url.contains(pattern));
-      }
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  Future<void> _pickImage(Function(String) onPicked) async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+  Future<void> _pickSingleImage({
+    required String title,
+    required void Function(String path) onPicked,
+  }) async {
+    final source = await _showImageSourceSheet(title: title);
+    if (source == null) return;
+    final XFile? image = await _picker.pickImage(source: source);
     if (image != null) onPicked(image.path);
   }
 
+  Future<void> _pickStudioPhoto() async {
+    if (_studioPhotos.length >= 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Maximum 6 studio photos allowed")),
+      );
+      return;
+    }
+    final source = await _showImageSourceSheet(title: 'Add Studio Photo');
+    if (source == null) return;
+    final XFile? image = await _picker.pickImage(source: source);
+    if (image != null) {
+      setState(() {
+        if (_studioPhotos.length < 6) _studioPhotos.add(image.path);
+      });
+    }
+  }
+
+  void openTerms() async {
+    const url = 'https://dancekatta.com/terms-of-service/';
+    if (!await launchUrlString(url, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch $url');
+    }
+  }
+
+  // ─── Validators ───────────────────────────────────────────────
+  String? _validatePhoneNumber(String? value) {
+    if (value == null || value.isEmpty) return 'Phone number is required';
+    if (value.length != 10) return 'Phone number must be 10 digits';
+    if (!RegExp(r'^[0-9]+$').hasMatch(value))
+      return 'Phone number must contain only digits';
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) return 'Email is required';
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value))
+      return 'Please enter a valid email';
+    return null;
+  }
+
+  String? _validatePAN(String? value) {
+    if (value == null || value.isEmpty) return 'PAN number is required';
+    if (value.length != 10) return 'PAN number must be 10 characters';
+    if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(value.toUpperCase()))
+      return 'PAN format: ABCDE1234F (5 letters + 4 digits + 1 letter)';
+    return null;
+  }
+
+  String? _validateGST(String? value) {
+    if (value == null || value.isEmpty) return null;
+    if (value.length != 15) return 'GST number must be 15 characters';
+    if (!RegExp(
+      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
+    ).hasMatch(value.toUpperCase()))
+      return 'GST format: 22AAAAA0000A1Z5';
+    return null;
+  }
+
+  String? _validateIFSC(String? value) {
+    if (value == null || value.isEmpty) return 'IFSC code is required';
+    if (value.length != 11) return 'IFSC code must be 11 characters';
+    if (!RegExp(r'^[A-Z]{4}[0-9]{7}$').hasMatch(value.toUpperCase()))
+      return 'IFSC format: ABCD0001234 (4 letters + 7 digits)';
+    return null;
+  }
+
+  String? _validateBankAccount(String? value) {
+    if (value == null || value.isEmpty)
+      return 'Bank account number is required';
+    if (value.length < 9 || value.length > 18)
+      return 'Bank account number must be 9-18 digits';
+    if (!RegExp(r'^[0-9]+$').hasMatch(value))
+      return 'Bank account number must contain only digits';
+    return null;
+  }
+
+  String? _validateRequired(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) return '$fieldName is required';
+    return null;
+  }
+
+  // ─── Navigation ───────────────────────────────────────────────
   Future<void> _registerStudioFirstPage() async {
     if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) {
@@ -209,13 +239,115 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
       );
       return;
     }
-    // Only move to next page, do not submit to backend!
     _pageController.nextPage(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // ✅ FIX: Upload single image with a longer timeout
+  // ─────────────────────────────────────────────────────────────
+  Future<String?> _uploadSingle(File file, String url, String fieldName) async {
+    try {
+      final ext = file.path.split('.').last.toLowerCase();
+      final mimeType = lookupMimeType(file.path) ?? 'image/jpeg';
+      final parts = mimeType.split('/');
+
+      var request = http.MultipartRequest('POST', Uri.parse(url));
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          fieldName,
+          file.path,
+          contentType: MediaType(parts[0], parts[1]),
+        ),
+      );
+
+      // ✅ FIX 1: Added timeout — large images were causing silent hangs
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () =>
+            throw Exception('Upload timed out. Check your connection.'),
+      );
+
+      final respStr = await streamedResponse.stream.bytesToString();
+
+      if (streamedResponse.statusCode == 200 ||
+          streamedResponse.statusCode == 201) {
+        // ✅ FIX 2: Safe JSON decode with clear error message
+        dynamic decoded;
+        try {
+          decoded = jsonDecode(respStr);
+        } catch (_) {
+          throw Exception('Server returned invalid response: $respStr');
+        }
+
+        final path = decoded['path'] as String?;
+        if (path == null || path.isEmpty) {
+          throw Exception('Server returned empty path for $fieldName');
+        }
+        return path;
+      } else {
+        throw Exception(
+          'Upload failed (${streamedResponse.statusCode}): $respStr',
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // ✅ FIX: Upload multiple images ONE BY ONE (not all at once)
+  //
+  // ROOT CAUSE OF YOUR ERROR:
+  //   The original code sent all 6 images in a single multipart
+  //   request. With 6 photos this easily exceeds server body limits
+  //   (default ~10MB on most Node/Express setups) OR causes a
+  //   timeout, resulting in an unhandled exception.
+  //
+  // THE FIX:
+  //   Upload each photo individually and collect all returned paths.
+  //   This is more reliable, shows progress, and avoids body-size
+  //   limits entirely.
+  // ─────────────────────────────────────────────────────────────
+  Future<List<String>> _uploadStudioPhotosOneByOne(List<File> files) async {
+    final List<String> uploadedPaths = [];
+
+    setState(() {
+      _totalToUpload = files.length;
+      _uploadedCount = 0;
+      _uploadStatus = 'Uploading photo 1 of ${files.length}...';
+    });
+
+    for (int i = 0; i < files.length; i++) {
+      setState(() {
+        _uploadStatus = 'Uploading photo ${i + 1} of ${files.length}...';
+      });
+
+      final path = await _uploadSingle(
+        files[i],
+        "http://147.93.19.17:5002/api/studios/images",
+        "image",
+      );
+
+      if (path == null || path.isEmpty) {
+        throw Exception(
+          'Photo ${i + 1} upload failed — server returned empty path',
+        );
+      }
+
+      uploadedPaths.add(path);
+
+      setState(() {
+        _uploadedCount = i + 1;
+      });
+    }
+
+    return uploadedPaths;
+  }
+
+  // ─── Submit ───────────────────────────────────────────────────
   Future<void> _submitForm() async {
     if (_isSubmitting) return;
 
@@ -229,132 +361,99 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
       return;
     }
 
+    // ── Pre-submit validations ─────────────────────────────────
+    if (_logoFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload a studio logo'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_aadharFrontPath == null || _aadharBackPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload both Aadhaar front and back photos'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_studioPhotos.length < 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload at least 5 studio photos'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
+      _uploadStatus = 'Getting location...';
     });
 
     try {
-      // 1️⃣ Validate required images
-      if (_logoFile == null) throw Exception('Please upload a studio logo');
-      if (_aadharFrontPath == null || _aadharBackPath == null) {
-        throw Exception('Please upload both Aadhaar front and back photos');
-      }
-      if (_studioPhotos.isEmpty || _studioPhotos.length < 5) {
-        throw Exception('Please upload at least 5 studio photos');
-      }
+      // ── Location ───────────────────────────────────────────────
+      Position position =
+          await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          ).timeout(
+            const Duration(seconds: 15),
+            onTimeout: () =>
+                throw Exception('Location timed out. Please enable GPS.'),
+          );
 
-      // 2️⃣ Get current location
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
       final ownerId = widget.user.id ?? '';
 
-      // ---------------------------
-      // 🔹 Helpers for uploads
-      // ---------------------------
-      Future<String?> _uploadSingleImage(
-        File file,
-        String url,
-        String fieldName,
-      ) async {
-        var request = http.MultipartRequest('POST', Uri.parse(url));
-        final ext = file.path.split('.').last.toLowerCase();
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            fieldName,
-            file.path,
-            contentType: MediaType('image', (ext == 'png') ? 'png' : 'jpeg'),
-          ),
-        );
-
-        var response = await request.send();
-        print('Upload to $url status: ${response.statusCode}');
-        final respStr = await response.stream.bytesToString();
-        print('Upload response: $respStr');
-
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          final data = jsonDecode(respStr);
-          return data['path'] as String?;
-        } else {
-          throw Exception('Upload failed: $respStr');
-        }
-      }
-
-      Future<List<String>> _uploadMultipleImages(
-        List<File> files,
-        String url,
-        String fieldName,
-      ) async {
-        var request = http.MultipartRequest('POST', Uri.parse(url));
-
-        for (var f in files) {
-          final mimeType = lookupMimeType(f.path) ?? 'application/octet-stream';
-          final parts = mimeType.split('/'); // ['image','jpeg']
-
-          request.files.add(
-            await http.MultipartFile.fromPath(
-              fieldName,
-              f.path,
-              contentType: MediaType(parts[0], parts[1]),
-            ),
-          );
-        }
-
-        var response = await request.send();
-        final respStr = await response.stream.bytesToString();
-        print('Upload to $url status: ${response.statusCode}');
-        print('Upload response: $respStr');
-
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          final data = jsonDecode(respStr);
-          return List<String>.from(data['paths']);
-        } else {
-          throw Exception('Studio images upload failed: $respStr');
-        }
-      }
-
-      // ---------------------------
-      // 🔹 Upload images one by one
-      // ---------------------------
-
-      // ✅ Upload logo
-      final logoPath = await _uploadSingleImage(
+      // ── Upload Logo ────────────────────────────────────────────
+      setState(() => _uploadStatus = 'Uploading logo...');
+      final logoPath = await _uploadSingle(
         File(_logoFile!.path),
         "http://147.93.19.17:5002/api/studios/logo",
         "image",
       );
-      if (logoPath == null) throw Exception("Logo upload failed!");
+      if (logoPath == null)
+        throw Exception("Logo upload failed — server returned empty path");
 
-      // ✅ Aadhaar front
-      final aadharFrontPath = await _uploadSingleImage(
+      // ── Upload Aadhaar Front ───────────────────────────────────
+      setState(() => _uploadStatus = 'Uploading Aadhaar front...');
+      final aadharFrontPath = await _uploadSingle(
         File(_aadharFrontPath!),
         "http://147.93.19.17:5002/api/studios/aadhar-front",
         "image",
       );
       if (aadharFrontPath == null)
-        throw Exception("Aadhaar front upload failed!");
+        throw Exception("Aadhaar front upload failed");
 
-      // ✅ Aadhaar back
-      final aadharBackPath = await _uploadSingleImage(
+      // ── Upload Aadhaar Back ────────────────────────────────────
+      setState(() => _uploadStatus = 'Uploading Aadhaar back...');
+      final aadharBackPath = await _uploadSingle(
         File(_aadharBackPath!),
         "http://147.93.19.17:5002/api/studios/aadhar-back",
         "image",
       );
-      if (aadharBackPath == null)
-        throw Exception("Aadhaar back upload failed!");
+      if (aadharBackPath == null) throw Exception("Aadhaar back upload failed");
 
-      // ✅ Studio images
-      final studioPhotoPaths = await _uploadMultipleImages(
+      // ── Upload Studio Photos one by one ───────────────────────
+      // ✅ THIS IS THE KEY FIX — was previously one big multipart request
+      final studioPhotoPaths = await _uploadStudioPhotosOneByOne(
         _studioPhotos.map((p) => File(p)).toList(),
-        "http://147.93.19.17:5002/api/studios/images",
-        "images",
       );
-      if (studioPhotoPaths.length < 5)
-        throw Exception("Studio images upload failed!");
 
-      // ---------------------------
-      // 🔹 Prepare registration data
-      // ---------------------------
+      if (studioPhotoPaths.length < 5) {
+        throw Exception(
+          "Only ${studioPhotoPaths.length} studio photos uploaded. Need at least 5.",
+        );
+      }
+
+      // ── Build payload & register ───────────────────────────────
+      setState(() => _uploadStatus = 'Registering studio...');
+
       final studioData = {
         "ownerId": ownerId,
         "studioName": _studioNameController.text,
@@ -370,13 +469,10 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
         "studioFacebook": _facebookController.text,
         "studioYoutube": _youtubeController.text,
         "studioInstagram": _instagramController.text,
-
-        // ✅ Uploaded image paths
         "logoUrl": logoPath,
         "aadharFrontPhoto": aadharFrontPath,
         "aadharBackPhoto": aadharBackPath,
         "studioPhotos": studioPhotoPaths,
-
         "createdAt": DateTime.now().toIso8601String(),
         "updatedAt": DateTime.now().toIso8601String(),
         "status": "Pending",
@@ -386,21 +482,23 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
         "longitude": position.longitude.toString(),
       };
 
-      // ---------------------------
-      // 🔹 Submit studio registration
-      // ---------------------------
-      final response = await http.post(
-        Uri.parse('http://147.93.19.17:5002/api/studios'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(studioData),
-      );
-
-      print('Studio registration status: ${response.statusCode}');
-      print('Studio registration response: ${response.body}');
+      final response = await http
+          .post(
+            Uri.parse('http://147.93.19.17:5002/api/studios'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(studioData),
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('Registration request timed out'),
+          );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Studio registered successfully!')),
+          const SnackBar(
+            content: Text('Studio registered successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pushReplacement(
           context,
@@ -409,22 +507,38 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
           ),
         );
       } else {
-        throw Exception('Failed to register studio: ${response.body}');
+        // ✅ FIX 3: Show actual server error message instead of raw body
+        dynamic errBody;
+        try {
+          errBody = jsonDecode(response.body);
+        } catch (_) {
+          errBody = {'message': response.body};
+        }
+        final msg =
+            errBody['message'] ??
+            errBody['error'] ??
+            'Unknown error from server';
+        throw Exception('Registration failed: $msg');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error submitting form: $e'),
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     } finally {
       setState(() {
         _isSubmitting = false;
+        _uploadStatus = '';
+        _uploadedCount = 0;
+        _totalToUpload = 0;
       });
     }
   }
 
+  // ─── Helper widgets ───────────────────────────────────────────
   Widget _labeledField(String label, bool required, Widget field) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,10 +567,91 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
     );
   }
 
+  Widget _photoPickerBox({
+    required String? imagePath,
+    required String label,
+    required VoidCallback onTap,
+    double height = 100,
+    double? width,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: height,
+        width: width,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: imagePath == null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_a_photo, size: 30, color: Colors.grey),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              )
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(File(imagePath), fit: BoxFit.cover),
+              ),
+      ),
+    );
+  }
+
+  // ─── Upload progress banner ───────────────────────────────────
+  Widget _buildUploadProgressBanner() {
+    if (!_isSubmitting || _uploadStatus.isEmpty) return const SizedBox.shrink();
+
+    final bool showProgress = _totalToUpload > 0;
+    final double progress = showProgress ? _uploadedCount / _totalToUpload : 0;
+
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFF3A5ED4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _uploadStatus,
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+          ),
+          if (showProgress) ...[
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: Colors.white24,
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                minHeight: 4,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$_uploadedCount / $_totalToUpload photos uploaded',
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+            ),
+          ] else
+            const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  // ─── Build ────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      // ✅ Progress banner shown at top during upload
+      bottomNavigationBar: _buildUploadProgressBanner(),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -464,12 +659,13 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
             controller: _pageController,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              // Page 1: Studio details
+              // ══════════════════════════════════════════
+              // PAGE 1 – Studio details
+              // ══════════════════════════════════════════
               SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ðŸ”µ Top Welcome Header
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.only(
@@ -477,19 +673,17 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                         bottom: 40,
                         left: 24,
                         right: 24,
-                      ), // added side padding
+                      ),
                       decoration: const BoxDecoration(
-                        color: Color(0xFF3A5ED4), // Solid background color
+                        color: Color(0xFF3A5ED4),
                         borderRadius: BorderRadius.only(
                           bottomLeft: Radius.circular(30),
                           bottomRight: Radius.circular(30),
                         ),
                       ),
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start, // left align text
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 🔙 Back button with title
                           Row(
                             children: [
                               IconButton(
@@ -498,9 +692,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                   color: Colors.white,
                                   size: 28,
                                 ),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
+                                onPressed: () => Navigator.pop(context),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
                               ),
@@ -546,7 +738,6 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                       ),
                     ),
 
-                    // ðŸ”½ Your existing form content
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -573,7 +764,6 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               ),
                               validator: (v) =>
                                   _validateRequired(v, 'Studio Name'),
-                              // textCapitalization: TextCapitalization.words,
                             ),
                           ),
                           _labeledField(
@@ -584,12 +774,11 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               textCapitalization: TextCapitalization.sentences,
                               inputFormatters: [FirstLetterCapitalizer()],
                               decoration: const InputDecoration(
-                                hintText: 'Enter link here',
+                                hintText: 'Enter registered address',
                                 border: OutlineInputBorder(),
                               ),
                               validator: (v) =>
                                   _validateRequired(v, 'Registered Address'),
-                              //textCapitalization: TextCapitalization.sentences,
                               maxLines: 3,
                             ),
                           ),
@@ -602,7 +791,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 hintText: 'Enter email ID here',
                                 border: OutlineInputBorder(),
                               ),
-                              validator: (v) => _validateEmail(v),
+                              validator: _validateEmail,
                               keyboardType: TextInputType.emailAddress,
                               textInputAction: TextInputAction.next,
                             ),
@@ -616,7 +805,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 hintText: 'Enter number here',
                                 border: OutlineInputBorder(),
                               ),
-                              validator: (v) => _validatePhoneNumber(v),
+                              validator: _validatePhoneNumber,
                               keyboardType: TextInputType.phone,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
@@ -634,7 +823,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 hintText: 'Enter GST registration number',
                                 border: OutlineInputBorder(),
                               ),
-                              validator: (v) => _validateGST(v),
+                              validator: _validateGST,
                               textCapitalization: TextCapitalization.characters,
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(
@@ -645,6 +834,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               textInputAction: TextInputAction.next,
                             ),
                           ),
+
                           const SizedBox(height: 8),
                           const Text(
                             'KYC Details of Studio Owner',
@@ -654,6 +844,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
+
                           _labeledField(
                             'PAN Number of Owner',
                             true,
@@ -663,7 +854,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 hintText: 'Enter PAN',
                                 border: OutlineInputBorder(),
                               ),
-                              validator: (v) => _validatePAN(v),
+                              validator: _validatePAN,
                               textCapitalization: TextCapitalization.characters,
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(
@@ -674,121 +865,71 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               textInputAction: TextInputAction.next,
                             ),
                           ),
-                          Row(
+
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Aadhar Number of Owner',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                              Row(
+                                children: const [
+                                  Text(
+                                    'Aadhaar Card of Owner',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () => _pickImage(
-                                              (path) => setState(
-                                                () => _aadharFrontPath = path,
-                                              ),
-                                            ),
-                                            child: Container(
-                                              height:
-                                                  100, // Increased from 60 to 100
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                  color: Colors.grey,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: _aadharFrontPath == null
-                                                  ? Column(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: const [
-                                                        Icon(
-                                                          Icons.add_a_photo,
-                                                          size: 30,
-                                                          color: Colors.grey,
-                                                        ),
-                                                        SizedBox(height: 4),
-                                                        Text(
-                                                          'Front',
-                                                          style: TextStyle(
-                                                            color: Colors.grey,
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    )
-                                                  : Image.file(
-                                                      File(_aadharFrontPath!),
-                                                      fit: BoxFit.cover,
-                                                    ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () => _pickImage(
-                                              (path) => setState(
-                                                () => _aadharBackPath = path,
-                                              ),
-                                            ),
-                                            child: Container(
-                                              height:
-                                                  100, // Increased from 60 to 100
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                  color: Colors.grey,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: _aadharBackPath == null
-                                                  ? Column(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: const [
-                                                        Icon(
-                                                          Icons.add_a_photo,
-                                                          size: 30,
-                                                          color: Colors.grey,
-                                                        ),
-                                                        SizedBox(height: 4),
-                                                        Text(
-                                                          'Back',
-                                                          style: TextStyle(
-                                                            color: Colors.grey,
-                                                            fontSize: 12,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    )
-                                                  : Image.file(
-                                                      File(_aadharBackPath!),
-                                                      fit: BoxFit.cover,
-                                                    ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                  ),
+                                  Text(
+                                    ' *',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    const SizedBox(height: 16),
-                                  ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Upload front and back of your Aadhaar card',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black54,
                                 ),
                               ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _photoPickerBox(
+                                      imagePath: _aadharFrontPath,
+                                      label: 'Front',
+                                      onTap: () => _pickSingleImage(
+                                        title: 'Aadhaar Front',
+                                        onPicked: (path) => setState(
+                                          () => _aadharFrontPath = path,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _photoPickerBox(
+                                      imagePath: _aadharBackPath,
+                                      label: 'Back',
+                                      onTap: () => _pickSingleImage(
+                                        title: 'Aadhaar Back',
+                                        onPicked: (path) => setState(
+                                          () => _aadharBackPath = path,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
                             ],
                           ),
+
                           const SizedBox(height: 8),
                           const Text(
                             'Bank Details of Studio',
@@ -798,6 +939,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
+
                           _labeledField(
                             'Bank Account Number',
                             true,
@@ -807,7 +949,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 hintText: 'Enter bank account number',
                                 border: OutlineInputBorder(),
                               ),
-                              validator: (v) => _validateBankAccount(v),
+                              validator: _validateBankAccount,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
@@ -846,7 +988,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 hintText: 'Enter IFSC code',
                                 border: OutlineInputBorder(),
                               ),
-                              validator: (v) => _validateIFSC(v),
+                              validator: _validateIFSC,
                               textCapitalization: TextCapitalization.characters,
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(
@@ -857,13 +999,14 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               textInputAction: TextInputAction.next,
                             ),
                           ),
+
                           const SizedBox(height: 8),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
                               onPressed: _isSubmitting
                                   ? null
-                                  : () => _registerStudioFirstPage(),
+                                  : _registerStudioFirstPage,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2563EB),
                                 foregroundColor: Colors.white,
@@ -874,22 +1017,13 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              child: _isSubmitting
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Next',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                              child: const Text(
+                                'Next',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -899,12 +1033,13 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                 ),
               ),
 
-              // Page 2: Logo and photos
+              // ══════════════════════════════════════════
+              // PAGE 2 – Logo, Studio Photos & Links
+              // ══════════════════════════════════════════
               SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ðŸ”µ Top Welcome Header with Back Arrow
                     Stack(
                       children: [
                         Container(
@@ -925,9 +1060,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const SizedBox(
-                                height: 1,
-                              ), // Slight space from top
+                              const SizedBox(height: 1),
                               Text(
                                 'Welcome to',
                                 style: GoogleFonts.poppins(
@@ -957,22 +1090,20 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                             ],
                           ),
                         ),
-                        // Back Arrow positioned top left
                         Positioned(
-                          top:
-                              -1, // match padding top + slight offset for center alignment with text
-                          left: -1, // match left padding for visual match
+                          top: -1,
+                          left: -1,
                           child: IconButton(
                             icon: const Icon(
                               Icons.arrow_back,
                               color: Colors.white,
                             ),
-                            onPressed: () {
-                              _pageController.previousPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
-                            },
+                            onPressed: _isSubmitting
+                                ? null
+                                : () => _pageController.previousPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  ),
                           ),
                         ),
                       ],
@@ -991,16 +1122,17 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
+
                           Row(
-                            children: [
-                              const Text(
+                            children: const [
+                              Text(
                                 'Upload Logo',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const Text(
+                              Text(
                                 ' *',
                                 style: TextStyle(
                                   color: Colors.red,
@@ -1010,41 +1142,28 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () async {
-                              final pickedFile = await _picker.pickImage(
-                                source: ImageSource.gallery,
-                              );
-                              if (pickedFile != null) {
-                                setState(() {
-                                  _logoFile = File(pickedFile.path);
-                                });
-                              }
-                            },
-                            child: Container(
-                              height: 100,
-                              width: 100,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: _logoFile != null
-                                  ? Image.file(_logoFile!, fit: BoxFit.cover)
-                                  : const Center(
-                                      child: Icon(Icons.add_a_photo),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
                           const Text(
-                            'PNG / JPEG / JPG\nMax size: 2 MB',
+                            'PNG / JPEG / JPG  •  Max size: 2 MB',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.black54,
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          _photoPickerBox(
+                            imagePath: _logoFile?.path,
+                            label: 'Logo',
+                            width: 100,
+                            onTap: () => _pickSingleImage(
+                              title: 'Studio Logo',
+                              onPicked: (path) =>
+                                  setState(() => _logoFile = File(path)),
+                            ),
+                          ),
+
                           const SizedBox(height: 24),
+
                           Row(
                             children: const [
                               Text(
@@ -1064,9 +1183,9 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
                           const Text(
-                            'Only PNG / JPEG / JPG\nMax size: 2 MB per photo',
+                            'Only PNG / JPEG / JPG  •  Max size: 2 MB per photo',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.black54,
@@ -1074,12 +1193,37 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                           ),
                           const SizedBox(height: 8),
 
+                          // ✅ Photo count indicator
+                          Row(
+                            children: [
+                              Text(
+                                '${_studioPhotos.length} / 6 photos added',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _studioPhotos.length >= 5
+                                      ? Colors.green
+                                      : Colors.orange,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              if (_studioPhotos.length < 5)
+                                const Text(
+                                  '  (minimum 5 required)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
                           GridView.builder(
                             shrinkWrap: true,
-                            itemCount: _studioPhotos.length < 5
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _studioPhotos.length < 6
                                 ? _studioPhotos.length + 1
                                 : 6,
-                            physics: const NeverScrollableScrollPhysics(),
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 3,
@@ -1089,32 +1233,33 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                             itemBuilder: (context, index) {
                               if (index < _studioPhotos.length) {
                                 final photo = _studioPhotos[index];
-
                                 return Stack(
                                   children: [
                                     Positioned.fill(
-                                      child:
-                                          photo.startsWith(
-                                            "http",
-                                          ) // already uploaded
-                                          ? Image.network(
-                                              photo,
-                                              fit: BoxFit.cover,
-                                            )
-                                          : Image.file(
-                                              File(photo),
-                                              fit: BoxFit.cover,
-                                            ), // local preview
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: photo.startsWith("http")
+                                            ? Image.network(
+                                                photo,
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Image.file(
+                                                File(photo),
+                                                fit: BoxFit.cover,
+                                              ),
+                                      ),
                                     ),
                                     Positioned(
                                       top: 4,
                                       right: 4,
                                       child: GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            _studioPhotos.removeAt(index);
-                                          });
-                                        },
+                                        onTap: _isSubmitting
+                                            ? null
+                                            : () => setState(
+                                                () => _studioPhotos.removeAt(
+                                                  index,
+                                                ),
+                                              ),
                                         child: Container(
                                           decoration: const BoxDecoration(
                                             shape: BoxShape.circle,
@@ -1133,25 +1278,38 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 );
                               }
 
-                              // Add new photo button
                               return GestureDetector(
-                                onTap: () => _pickImage((path) {
-                                  setState(() {
-                                    if (_studioPhotos.length < 6)
-                                      _studioPhotos.add(path);
-                                  });
-                                }),
+                                onTap: _isSubmitting ? null : _pickStudioPhoto,
                                 child: Container(
                                   decoration: BoxDecoration(
                                     border: Border.all(color: Colors.grey),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.add),
+                                  child: const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_a_photo,
+                                        color: Colors.grey,
+                                        size: 28,
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Add Photo',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               );
                             },
                           ),
+
                           const SizedBox(height: 24),
+
                           _labeledField(
                             'Studio Introduction',
                             true,
@@ -1166,7 +1324,6 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               ),
                               validator: (v) =>
                                   _validateRequired(v, 'Studio Introduction'),
-                              // textCapitalization: TextCapitalization.sentences,
                               textInputAction: TextInputAction.newline,
                             ),
                           ),
@@ -1181,8 +1338,7 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 border: OutlineInputBorder(),
                               ),
                               validator: (v) {
-                                if (v == null || v.trim().isEmpty)
-                                  return null; // optional
+                                if (v == null || v.trim().isEmpty) return null;
                                 if (!v.contains('.'))
                                   return 'Please enter a valid website URL';
                                 return null;
@@ -1191,7 +1347,6 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               textInputAction: TextInputAction.next,
                             ),
                           ),
-
                           _labeledField(
                             'Studio Facebook Page',
                             false,
@@ -1202,18 +1357,15 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 border: OutlineInputBorder(),
                               ),
                               validator: (v) {
-                                if (v == null || v.trim().isEmpty)
-                                  return null; // optional
-                                if (!v.toLowerCase().contains('facebook')) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                if (!v.toLowerCase().contains('facebook'))
                                   return 'Please enter a valid Facebook URL';
-                                }
                                 return null;
                               },
                               keyboardType: TextInputType.url,
                               textInputAction: TextInputAction.next,
                             ),
                           ),
-
                           _labeledField(
                             'Studio YouTube Page',
                             false,
@@ -1224,18 +1376,15 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 border: OutlineInputBorder(),
                               ),
                               validator: (v) {
-                                if (v == null || v.trim().isEmpty)
-                                  return null; // optional
-                                if (!v.toLowerCase().contains('youtube')) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                if (!v.toLowerCase().contains('youtube'))
                                   return 'Please enter a valid YouTube URL';
-                                }
                                 return null;
                               },
                               keyboardType: TextInputType.url,
                               textInputAction: TextInputAction.next,
                             ),
                           ),
-
                           _labeledField(
                             'Studio Instagram Page',
                             false,
@@ -1246,11 +1395,9 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                 border: OutlineInputBorder(),
                               ),
                               validator: (v) {
-                                if (v == null || v.trim().isEmpty)
-                                  return null; // optional
-                                if (!v.toLowerCase().contains('instagram')) {
+                                if (v == null || v.trim().isEmpty) return null;
+                                if (!v.toLowerCase().contains('instagram'))
                                   return 'Please enter a valid Instagram URL';
-                                }
                                 return null;
                               },
                               keyboardType: TextInputType.url,
@@ -1265,9 +1412,11 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                             children: [
                               Checkbox(
                                 value: _termsAccepted,
-                                onChanged: (val) {
-                                  setState(() => _termsAccepted = val ?? false);
-                                },
+                                onChanged: _isSubmitting
+                                    ? null
+                                    : (val) => setState(
+                                        () => _termsAccepted = val ?? false,
+                                      ),
                               ),
                               Expanded(
                                 child: RichText(
@@ -1287,21 +1436,8 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                           decoration: TextDecoration.underline,
                                         ),
                                         recognizer: TapGestureRecognizer()
-                                          ..onTap = () async {
-                                            const url =
-                                                'https://dancekatta.com/terms-of-service/';
-                                            if (!await launchUrlString(
-                                              url,
-                                              mode: LaunchMode
-                                                  .externalApplication,
-                                            )) {
-                                              debugPrint(
-                                                'Could not launch $url',
-                                              );
-                                            }
-                                          },
+                                          ..onTap = openTerms,
                                       ),
-
                                       const TextSpan(
                                         text:
                                             ' of Dance Katta, Dance Mate and Dance Count',
@@ -1312,23 +1448,23 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                               ),
                             ],
                           ),
+
                           const SizedBox(height: 8),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
                               onPressed: (!_termsAccepted || _isSubmitting)
                                   ? null
-                                  : () => _submitForm(),
-
+                                  : _submitForm,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
                                     (_termsAccepted && !_isSubmitting)
-                                    ? const Color(0xFF2563EB) // Enabled color
-                                    : Colors.grey.shade400, // Disabled color
+                                    ? const Color(0xFF2563EB)
+                                    : Colors.grey.shade400,
                                 foregroundColor:
                                     (_termsAccepted && !_isSubmitting)
                                     ? Colors.white
-                                    : Colors.white70, // Slightly faded text
+                                    : Colors.white70,
                                 elevation: (_termsAccepted && !_isSubmitting)
                                     ? 4
                                     : 0,
@@ -1339,7 +1475,6 @@ class _StudioRegistrationScreenState extends State<StudioRegistrationScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-
                               child: _isSubmitting
                                   ? const SizedBox(
                                       height: 20,

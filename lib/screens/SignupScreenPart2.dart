@@ -1,16 +1,12 @@
+//final updated
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/upload_service.dart';
-import 'dart:io';
-import 'package:google_fonts/google_fonts.dart';
-// import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
-import 'home_screen.dart';
-import '../models/user_model.dart';
-import '../screens/signup_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/session_manager.dart';
+import '../models/user_model.dart';
+import 'home_screen.dart';
 
 class SignupScreenPart2 extends StatefulWidget {
   final String firstName;
@@ -61,11 +57,11 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
 
   String? _isProfessional;
   List<Map<String, String?>> skills = [];
-
+  String? _skillsError;
   bool _isLoading = false;
-  // State variables for image picking
-  // File? _profileImage;
-  // final ImagePicker _picker = ImagePicker();
+
+  // ✅ Centralized base URL
+  static const String _baseUrl = 'http://147.93.19.17:5001/api/signup';
 
   final List<String> danceStyles = [
     'Hip-Hop',
@@ -87,16 +83,20 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
     'Expert',
   ];
 
-  String? _skillsError;
+  @override
+  void dispose() {
+    _youtubeController.dispose();
+    _facebookController.dispose();
+    _instagramController.dispose();
+    _experienceController.dispose();
+    super.dispose();
+  }
 
   void _addSkillRow() {
-    setState(() {
-      skills.add({'style': null, 'level': null});
-    });
+    setState(() => skills.add({'style': null, 'level': null}));
   }
 
   Widget _buildSkillRow(int index) {
-    // Get all selected styles except the current row
     final selectedStyles = skills
         .asMap()
         .entries
@@ -104,7 +104,6 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
         .map((entry) => entry.value['style'])
         .toList();
 
-    // Filter danceStyles to remove already selected ones
     final availableStyles = danceStyles
         .where((style) => !selectedStyles.contains(style))
         .toList();
@@ -114,12 +113,10 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
     String? styleError;
     String? levelError;
 
-    // Validation: if level is filled but style is empty
     if ((style == null || style.isEmpty) &&
         (level != null && level.isNotEmpty)) {
       styleError = 'Select dance style';
     }
-    // Validation: if style is filled but level is empty
     if ((style != null && style.isNotEmpty) &&
         (level == null || level.isEmpty)) {
       levelError = 'Select expertise level';
@@ -136,15 +133,11 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
               children: [
                 const Text(
                   'Dance Style',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 DropdownMenu<String>(
-                  initialSelection:
-                      skills[index]['style'] ?? '', // Added null check
+                  initialSelection: skills[index]['style'] ?? '',
                   expandedInsets: EdgeInsets.zero,
                   inputDecorationTheme: InputDecorationTheme(
                     hintStyle: const TextStyle(color: Colors.grey),
@@ -157,30 +150,24 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
                     ),
                   ),
                   hintText: 'Select Dance Style',
-                  dropdownMenuEntries: availableStyles.map((style) {
-                    return DropdownMenuEntry<String>(
-                      value: style,
-                      label: style,
-                    );
-                  }).toList(),
+                  dropdownMenuEntries: availableStyles
+                      .map((s) => DropdownMenuEntry<String>(value: s, label: s))
+                      .toList(),
                   onSelected: (val) {
                     if (selectedStyles.contains(val)) {
-                      // Extra safety validation
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text('You have already selected this style'),
-                          duration: const Duration(seconds: 2),
+                          duration: Duration(seconds: 2),
                         ),
                       );
                     } else {
-                      setState(() {
-                        skills[index]['style'] = val;
-                      });
+                      setState(() => skills[index]['style'] = val);
                     }
                   },
                   menuStyle: MenuStyle(
                     alignment: AlignmentDirectional.bottomStart,
-                    maximumSize: MaterialStateProperty.all<Size>(
+                    maximumSize: WidgetStateProperty.all(
                       const Size.fromHeight(200),
                     ),
                   ),
@@ -197,8 +184,6 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
             ),
           ),
           const SizedBox(width: 8),
-
-          // Expertise Level dropdown
           Expanded(
             flex: 4,
             child: Column(
@@ -206,15 +191,11 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
               children: [
                 const Text(
                   'Expertise Level',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 DropdownMenu<String>(
-                  initialSelection:
-                      skills[index]['level'] ?? '', // Added null check
+                  initialSelection: skills[index]['level'] ?? '',
                   expandedInsets: EdgeInsets.zero,
                   inputDecorationTheme: InputDecorationTheme(
                     hintStyle: const TextStyle(color: Colors.grey),
@@ -227,21 +208,14 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
                     ),
                   ),
                   hintText: 'Select Expertise Level',
-                  dropdownMenuEntries: expertiseLevels.map((level) {
-                    return DropdownMenuEntry<String>(
-                      value: level,
-                      label: level,
-                    );
-                  }).toList(),
-                  onSelected: (val) {
-                    setState(() {
-                      skills[index]['level'] = val;
-                    });
-                  },
+                  dropdownMenuEntries: expertiseLevels
+                      .map((l) => DropdownMenuEntry<String>(value: l, label: l))
+                      .toList(),
+                  onSelected: (val) =>
+                      setState(() => skills[index]['level'] = val),
                   menuStyle: MenuStyle(
-                    alignment:
-                        AlignmentDirectional.bottomStart, // ✅ always downward
-                    maximumSize: MaterialStateProperty.all<Size>(
+                    alignment: AlignmentDirectional.bottomStart,
+                    maximumSize: WidgetStateProperty.all(
                       const Size.fromHeight(200),
                     ),
                   ),
@@ -257,10 +231,6 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
               ],
             ),
           ),
-
-          const SizedBox(width: 8),
-
-          // Delete button
           Padding(
             padding: const EdgeInsets.only(top: 8.0, left: 8.0),
             child: IconButton(
@@ -273,27 +243,141 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
     );
   }
 
-  Future<String?> getUserIdFromStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('userId');
+  /* ========================
+     STEP 1 — SEND OTP
+  ======================== */
+  Future<void> _startOtpFlow() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/send-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': widget.email.toLowerCase().trim()}),
+      );
+
+      setState(() => _isLoading = false);
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        _showOtpDialog();
+      } else {
+        final body = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(body['message'] ?? 'Failed to send OTP')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error. Please try again.')),
+      );
+    }
   }
 
-  // Function to pick image from gallery
-  // Future<void> _pickProfileImage() async {
-  //   final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-  //   if (pickedFile != null) {
-  //     setState(() {
-  //       _profileImage = File(pickedFile.path);
-  //     });
-  //   }
-  // }Uri.parse("http://192.168.0.101:5002/api/users");
+  /* ========================
+     STEP 2 — OTP DIALOG
+  ======================== */
+  Future<void> _showOtpDialog() async {
+    final TextEditingController otpController = TextEditingController();
 
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enter OTP'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'An OTP has been sent to ${widget.email}',
+              style: const TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: otpController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                hintText: 'Enter 6-digit OTP',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final isVerified = await _verifyOtp(otpController.text.trim());
+              if (isVerified && mounted) {
+                Navigator.pop(dialogContext);
+                _registerUser(); // ✅ only proceeds after OTP is confirmed
+              }
+            },
+            child: const Text('Verify'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /* ========================
+     STEP 3 — VERIFY OTP
+  ======================== */
+  Future<bool> _verifyOtp(String otp) async {
+    if (otp.isEmpty || otp.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid 6-digit OTP')),
+      );
+      return false;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/verify-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': widget.email.toLowerCase().trim(),
+          'otp': otp,
+        }),
+      );
+
+      if (!mounted) return false;
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('OTP Verified Successfully!')),
+        );
+        return true;
+      } else {
+        final body = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(body['message'] ?? 'Invalid OTP')),
+        );
+        return false;
+      }
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error verifying OTP')),
+      );
+      return false;
+    }
+  }
+
+  /* ========================
+     STEP 4 — REGISTER USER
+  ======================== */
   Future<void> _registerUser() async {
     setState(() => _isLoading = true);
-    try {
-      print('Profile photo being sent: ${widget.profilePhoto}'); // Debug print
 
-      // Build payload only with non-empty profilePhoto
+    try {
       final payload = {
         "firstName": widget.firstName,
         "lastName": widget.lastName,
@@ -309,158 +393,134 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
         "state": widget.state,
         "country": widget.country,
         "pincode": widget.pincode,
-
-        // ✅ NEW FIELDS
         "youtubeLink": _youtubeController.text.trim(),
         "facebookLink": _facebookController.text.trim(),
         "instagramLink": _instagramController.text.trim(),
         "isProfessional": _isProfessional,
-        "experienceYears": _isProfessional == "Yes"
+        // ✅ FIXED: key name matches what backend's User schema stores as 'experience'
+        "experience": _isProfessional == "Yes"
             ? _experienceController.text.trim()
-            : null,
-
-        // ✅ Convert skills to clean array
+            : "",
         "skills": skills
-            .where(
-              (s) =>
-                  s['style'] != null &&
-                  s['style']!.isNotEmpty &&
-                  s['level'] != null &&
-                  s['level']!.isNotEmpty,
-            )
+            .where((s) => s['style'] != null && s['level'] != null)
             .map((s) => {"style": s['style'], "level": s['level']})
             .toList(),
+        if (widget.profilePhoto != null) "profilePhoto": widget.profilePhoto,
       };
 
-      if (widget.profilePhoto != null && widget.profilePhoto!.isNotEmpty) {
-        // ✅ Only pass the relative path, do NOT convert to full URL
-        payload["profilePhoto"] = widget.profilePhoto!;
-      }
-
       final response = await http.post(
-        Uri.parse("http://147.93.19.17:5002/api/users"),
+        Uri.parse('$_baseUrl/register-full'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(payload),
       );
 
-      print("Status Code: ${response.statusCode}");
-      print("Response Body: ${response.body}");
+      setState(() => _isLoading = false);
+      if (!mounted) return;
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final Map<String, dynamic> userData = jsonDecode(response.body);
-        setState(() => _isLoading = false);
-        // 🚨 Check if the user is disabled
-        if ((userData['status'] ?? '').toString().toLowerCase() == "disabled") {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                "This account has been disabled by the admin. Please try another email or contact support.",
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return; // ⛔ Stop here, don’t show success dialog or navigate
-        }
-
-        // ✅ No need to update profilePhoto again
-
-        _showResultDialog(isSuccess: true, userData: userData);
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        _showResultDialog(isSuccess: true, userData: responseData);
       } else {
         final err = jsonDecode(response.body);
-        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(err['message'] ?? "Registration failed")),
         );
-
         _showResultDialog(isSuccess: false);
       }
     } catch (e) {
+      setState(() => _isLoading = false);
+      if (!mounted) return;
       _showResultDialog(isSuccess: false);
     }
   }
 
-  Future<bool> _showResultDialog({
+  /* ========================
+     RESULT DIALOG
+  ======================== */
+  Future<void> _showResultDialog({
     required bool isSuccess,
     Map<String, dynamic>? userData,
   }) async {
-    return await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isSuccess ? Icons.check_circle : Icons.cancel,
+                size: 50,
+                color: isSuccess ? Colors.green : Colors.red,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isSuccess ? Icons.check_circle : Icons.cancel,
-                      size: 50,
-                      color: isSuccess ? Colors.green : Colors.red,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      isSuccess ? "Yayy!" : "Oh snap!",
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      isSuccess
-                          ? "Registration Successful"
-                          : "Failed to register",
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: isSuccess && userData != null
-                          ? () async {
-                              final user = UserModel.fromJson(userData['user']);
-
-                              // ✅ Save persistent login
-                              await SessionManager.saveUserSession(
-                                user.id ?? '',
-                              );
-
-                              // Close dialog
-                              Navigator.pop(context, isSuccess);
-
-                              // Navigate to Home
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => HomeScreen(user: user),
-                                ),
-                                (route) => false,
-                              );
-                            }
-                          : () {
-                              // just close dialog if failed
-                              Navigator.pop(context, isSuccess);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                      ),
-                      child: Text(isSuccess ? "Okay, Cool!" : "Try again"),
-                    ),
-                  ],
+              const SizedBox(height: 16),
+              Text(
+                isSuccess ? "Yayy!" : "Oh snap!",
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            );
-          },
-        ) ??
-        false;
+              const SizedBox(height: 8),
+              Text(
+                isSuccess ? "Registration Successful" : "Failed to register",
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: isSuccess && userData != null
+                    ? () async {
+                        // ✅ userData['user'] is the nested user object from { message, user }
+                        final user = UserModel.fromJson(userData['user']);
+                        await SessionManager.saveUserSession(user.id ?? '');
+
+                        if (!mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'A welcome email has been sent to your registered email!',
+                            ),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 4),
+                          ),
+                        );
+
+                        Navigator.pop(context); // close dialog
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => HomeScreen(user: user),
+                          ),
+                          (route) => false,
+                        );
+                      }
+                    : () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+                child: Text(
+                  isSuccess ? "Okay, Cool!" : "Try again",
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
+  /* ========================
+     BUILD UI
+  ======================== */
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -469,10 +529,10 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
         child: SingleChildScrollView(
           child: Form(
             key: _formKey,
-            autovalidateMode:
-                AutovalidateMode.onUserInteraction, // Enable inline validation
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             child: Column(
               children: [
+                // ── Header ──────────────────────────────────────────
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -480,80 +540,59 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
                     horizontal: 20,
                   ),
                   decoration: const BoxDecoration(
-                    color: Color(0xFF3A5ED4), // Solid background color
+                    color: Color(0xFF3A5ED4),
                     borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(30),
                       bottomRight: Radius.circular(30),
                     ),
                   ),
-                  child: Stack(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 🔙 Back Arrow (top-left)
-                      Positioned(
-                        left: -18,
-                        top: -18,
-                        child: IconButton(
-                          padding: EdgeInsets.zero, // ✅ remove default padding
-                          constraints:
-                              const BoxConstraints(), // ✅ remove default constraints
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                            size: 20, // you can tweak size here too
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Welcome to',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          color: Colors.white,
                         ),
                       ),
-
-                      // 🔵 Main content (pushed down so it doesn’t overlap arrow)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          top: 20,
-                        ), // space below arrow
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome to',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Dance Katta',
-                              style: GoogleFonts.robotoSlab(
-                                fontSize: 32,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Fill in the details mentioned',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w300,
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Dance Katta',
+                        style: GoogleFonts.robotoSlab(
+                          fontSize: 32,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Fill in the details mentioned',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          color: Colors.white,
                         ),
                       ),
                     ],
                   ),
                 ),
 
+                // ── Form Body ────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
-                      const SizedBox(height: 24),
-
                       const SizedBox(height: 24),
                       const Align(
                         alignment: Alignment.centerLeft,
@@ -572,16 +611,6 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
                           labelText: 'YouTube Page Link',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) {
-                          if (value != null && value.trim().isNotEmpty) {
-                            final pattern =
-                                r'^(https?:\/\/)?(www\.)?youtube\.com\/.*$';
-                            if (!RegExp(pattern).hasMatch(value.trim())) {
-                              return 'Enter a valid YouTube link';
-                            }
-                          }
-                          return null;
-                        },
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -590,16 +619,6 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
                           labelText: 'Facebook Page Link',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) {
-                          if (value != null && value.trim().isNotEmpty) {
-                            final pattern =
-                                r'^(https?:\/\/)?(www\.)?facebook\.com\/.*$';
-                            if (!RegExp(pattern).hasMatch(value.trim())) {
-                              return 'Enter a valid Facebook link';
-                            }
-                          }
-                          return null;
-                        },
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -608,47 +627,12 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
                           labelText: 'Instagram Page Link',
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) {
-                          if (value != null && value.trim().isNotEmpty) {
-                            final pattern =
-                                r'^(https?:\/\/)?(www\.)?instagram\.com\/.*$';
-                            if (!RegExp(pattern).hasMatch(value.trim())) {
-                              return 'Enter a valid Instagram link';
-                            }
-                          }
-                          return null;
-                        },
                       ),
                       const SizedBox(height: 16),
-
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: RichText(
-                          text: const TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'Are you a professional Choreographer?',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              TextSpan(
-                                text: ' *',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         value: _isProfessional,
                         decoration: const InputDecoration(
-                          hintText: 'Select your answer',
+                          hintText: 'Are you a professional dancer?',
                           border: OutlineInputBorder(),
                         ),
                         items: const [
@@ -661,188 +645,103 @@ class _SignupScreenPart2State extends State<SignupScreenPart2> {
                             value == null ? 'Please select an option' : null,
                       ),
                       const SizedBox(height: 16),
-
-                      // Teaching Experience (only if Yes)
                       if (_isProfessional == 'Yes')
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            RichText(
-                              text: const TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: 'Teaching Experience in Years',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: ' *',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _experienceController,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ], // ✅ Only numbers allowed],
-                              decoration: const InputDecoration(
-                                hintText: 'Enter experience in years',
-                                border: OutlineInputBorder(),
-                              ),
-                              autovalidateMode:
-                                  AutovalidateMode.onUserInteraction,
-                              validator: (value) {
-                                if (_isProfessional == 'Yes') {
-                                  if (value == null || value.isEmpty) {
-                                    return 'This field is required';
-                                  }
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 24),
+                        TextFormField(
+                          controller: _experienceController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
                           ],
-                        ),
-
-                      // Section Label
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Skills',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Colors.black,
+                          decoration: const InputDecoration(
+                            hintText: 'Enter experience in years',
+                            border: OutlineInputBorder(),
                           ),
+                          validator: (value) =>
+                              (_isProfessional == 'Yes' &&
+                                  (value == null || value.isEmpty))
+                              ? 'This field is required'
+                              : null,
                         ),
-                      ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 24),
 
-                      // Skill rows with dropdowns
+                      // ── Skills ───────────────────────────────────────
                       ...List.generate(skills.length, _buildSkillRow),
                       if (_skillsError != null)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 8, left: 4),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _skillsError!,
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            _skillsError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 13,
                             ),
                           ),
                         ),
-                      const SizedBox(height: 10),
-
-                      // Add Skill Button
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(
-                          onPressed: _addSkillRow,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Text(
-                                'Add Skill',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              SizedBox(
-                                width: 6,
-                              ), // spacing between text and icon
-                              Icon(
-                                Icons.add_circle,
-                                color: Color(0xFF3A5ED4),
-                                size: 26, // 🔥 increased size
-                              ),
-                            ],
-                          ),
-                        ),
+                      TextButton.icon(
+                        onPressed: _addSkillRow,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Skill'),
                       ),
-
                       const SizedBox(height: 30),
+
+                      // ── Submit ───────────────────────────────────────
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            bool hasError = false;
-                            _skillsError = null;
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  bool hasError = false;
+                                  _skillsError = null;
 
-                            // Validate skills: at least one skill with both style and level
-                            if (skills.isEmpty ||
-                                !skills.any(
-                                  (s) =>
-                                      (s['style'] != null &&
-                                          s['style']!.isNotEmpty) &&
-                                      (s['level'] != null &&
-                                          s['level']!.isNotEmpty),
-                                )) {
-                              _skillsError =
-                                  'Please add at least one skill with both style and level';
-                              hasError = true;
-                            }
+                                  if (skills.isEmpty ||
+                                      !skills.any(
+                                        (s) =>
+                                            s['style'] != null &&
+                                            s['level'] != null,
+                                      )) {
+                                    _skillsError =
+                                        'Please add at least one skill with both style and level';
+                                    hasError = true;
+                                  }
 
-                            // Validate each skill row for style/level dependency
-                            for (int i = 0; i < skills.length; i++) {
-                              final style = skills[i]['style'];
-                              final level = skills[i]['level'];
-                              if ((style == null || style.isEmpty) &&
-                                  (level != null && level.isNotEmpty)) {
-                                _skillsError =
-                                    'Please select dance style for all filled levels';
-                                hasError = true;
-                                break;
-                              }
-                              if ((style != null && style.isNotEmpty) &&
-                                  (level == null || level.isEmpty)) {
-                                _skillsError =
-                                    'Please select expertise level for all filled styles';
-                                hasError = true;
-                                break;
-                              }
-                            }
+                                  for (int i = 0; i < skills.length; i++) {
+                                    final s = skills[i]['style'];
+                                    final l = skills[i]['level'];
+                                    if (((s == null || s.isEmpty) &&
+                                            (l != null && l.isNotEmpty)) ||
+                                        ((s != null && s.isNotEmpty) &&
+                                            (l == null || l.isEmpty))) {
+                                      _skillsError =
+                                          'Please fill all skill rows correctly';
+                                      hasError = true;
+                                      break;
+                                    }
+                                  }
 
-                            setState(() {});
+                                  setState(() {});
 
-                            if (_formKey.currentState!.validate() &&
-                                !hasError) {
-                              _registerUser();
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please fill all required fields correctly.',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
+                                  if (_formKey.currentState!.validate() &&
+                                      !hasError) {
+                                    _startOtpFlow();
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Please fill all required fields correctly.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF3A5ED4),
+                            disabledBackgroundColor: Colors.grey,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
                           child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white,
                                 )
                               : const Text(
                                   'Register',

@@ -175,6 +175,64 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
     });
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // 📷 Reusable bottom sheet: Camera or Gallery
+  // ─────────────────────────────────────────────────────────────
+  Future<ImageSource?> _showImageSourceSheet({
+    String title = 'Select Image Source',
+  }) {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF3A5ED4),
+                  child: Icon(Icons.camera_alt, color: Colors.white),
+                ),
+                title: const Text('Take a Photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF3A5ED4),
+                  child: Icon(Icons.photo_library, color: Colors.white),
+                ),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _fetchAddressFromPincode(
     String pincode, {
     bool isUserAction = false,
@@ -284,10 +342,14 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // 🖼️ Pick profile image — Camera OR Gallery
+  // ─────────────────────────────────────────────────────────────
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-    );
+    final source = await _showImageSourceSheet(title: 'Profile Photo');
+    if (source == null) return;
+
+    final pickedFile = await ImagePicker().pickImage(source: source);
     if (pickedFile == null) return;
 
     try {
@@ -630,32 +692,52 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      // ✅ Profile photo with red * indicator
+                      // ✅ Profile photo with Camera + Gallery support
                       GestureDetector(
                         onTap: _pickImage,
                         child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 55,
-                              backgroundColor: Colors.grey[200],
-                              backgroundImage:
-                                  (_profilePhoto != null &&
-                                      _profilePhoto!.isNotEmpty &&
-                                      !_isSubmitting)
-                                  ? NetworkImage(getFullImageUrl(_profilePhoto))
-                                  : null,
-                              child: _isSubmitting
-                                  ? const CircularProgressIndicator(
-                                      color: Colors.blue,
-                                    )
-                                  : (_profilePhoto == null ||
-                                            _profilePhoto!.isEmpty
-                                        ? const Icon(
-                                            Icons.person,
-                                            size: 55,
-                                            color: Colors.grey,
-                                          )
-                                        : null),
+                            Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                CircleAvatar(
+                                  radius: 55,
+                                  backgroundColor: Colors.grey[200],
+                                  backgroundImage:
+                                      (_profilePhoto != null &&
+                                          _profilePhoto!.isNotEmpty &&
+                                          !_isSubmitting)
+                                      ? NetworkImage(
+                                          getFullImageUrl(_profilePhoto),
+                                        )
+                                      : null,
+                                  child: _isSubmitting
+                                      ? const CircularProgressIndicator(
+                                          color: Colors.blue,
+                                        )
+                                      : (_profilePhoto == null ||
+                                                _profilePhoto!.isEmpty
+                                            ? const Icon(
+                                                Icons.person,
+                                                size: 55,
+                                                color: Colors.grey,
+                                              )
+                                            : null),
+                                ),
+                                // Camera icon badge
+                                Container(
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF3A5ED4),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  padding: const EdgeInsets.all(6),
+                                  child: const Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 6),
                             RichText(

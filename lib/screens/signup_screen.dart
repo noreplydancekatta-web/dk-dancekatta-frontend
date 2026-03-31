@@ -1,3 +1,4 @@
+//final updated
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -11,7 +12,7 @@ import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import '/utils/url_helper.dart';
-import 'SignupScreenPart2.dart'; // or the correct path to SignupScreenPart2
+import 'SignupScreenPart2.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -28,10 +29,11 @@ class CapitalizeWordsFormatter extends TextInputFormatter {
   ) {
     final text = newValue.text
         .split(' ')
-        .map((word) =>
-            word.isNotEmpty
-                ? word[0].toUpperCase() + word.substring(1).toLowerCase()
-                : '')
+        .map(
+          (word) => word.isNotEmpty
+              ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+              : '',
+        )
         .join(' ');
 
     return newValue.copyWith(
@@ -40,6 +42,7 @@ class CapitalizeWordsFormatter extends TextInputFormatter {
     );
   }
 }
+
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _dateController = TextEditingController();
@@ -57,20 +60,18 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _pincodeController = TextEditingController();
   AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
 
-  // Dropdown controllers
   String? _selectedCity;
   String? _selectedState;
   String? _selectedCountry;
 
-  String? userId; // For inline error message
-  String? _uploadedProfilePhoto; // will store uploaded file path from backend
+  String? userId;
+  String? _uploadedProfilePhoto;
   File? _profileImage;
   bool _showGuardianFields = false;
 
-  String? emailError; // For inline email error message
-  bool isCheckingEmail = false; // Optional if you want to show a loading spinner while checking
+  String? emailError;
+  bool isCheckingEmail = false;
 
-  // Add error variables for dropdowns
   String? _cityError;
   String? _stateError;
   String? _countryError;
@@ -78,16 +79,6 @@ class _SignupScreenState extends State<SignupScreen> {
   List<String> _cities = [];
   List<String> _states = [];
   List<String> _countries = [];
-
-  // Sample data for dropdowns (replace with your actual data)
-  // final List<String> _cities = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad'];
-  // final List<String> _states = [
-  //   'Maharashtra',
-  //   'Delhi',
-  //   'Karnataka',
-  //   'Telangana',
-  // ];
-  // final List<String> _countries = ['India', 'USA', 'UK', 'Canada'];
 
   @override
   void initState() {
@@ -100,7 +91,9 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> checkEmailExists(String email) async {
     if (email.isEmpty || !email.contains('@')) return;
 
-    setState(() => isCheckingEmail = true);
+    setState(() {
+      isCheckingEmail = true;
+    });
 
     try {
       final response = await http.get(
@@ -110,19 +103,28 @@ class _SignupScreenState extends State<SignupScreen> {
       );
 
       if (response.statusCode == 200) {
-        // Email already exists
+        final data = jsonDecode(response.body);
         setState(() {
-          emailError = 'This email is already registered';
+          if (data['exists'] == true) {
+            emailError = "This email is already registered";
+          } else {
+            emailError = null;
+          }
         });
       } else {
         setState(() {
-          emailError = null; // email is free
+          emailError = null;
         });
       }
     } catch (e) {
-      print('Email check error: $e');
+      debugPrint("Email check error: $e");
+      setState(() {
+        emailError = null;
+      });
     } finally {
-      setState(() => isCheckingEmail = false);
+      setState(() {
+        isCheckingEmail = false;
+      });
     }
   }
 
@@ -186,7 +188,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
-      context: context, // ✅ correct BuildContext
+      context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
@@ -209,16 +211,71 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
+  // ✅ Updated: shows bottom sheet with Camera + Gallery options
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Select Profile Picture',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF3A5ED4),
+                    child: Icon(Icons.camera_alt, color: Colors.white),
+                  ),
+                  title: const Text('Take a Photo'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final pickedFile = await ImagePicker().pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 80,
+                    );
+                    if (pickedFile != null) {
+                      setState(() {
+                        _profileImage = File(pickedFile.path);
+                      });
+                    }
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF3A5ED4),
+                    child: Icon(Icons.photo_library, color: Colors.white),
+                  ),
+                  title: const Text('Choose from Gallery'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final pickedFile = await ImagePicker().pickImage(
+                      source: ImageSource.gallery,
+                      imageQuality: 80,
+                    );
+                    if (pickedFile != null) {
+                      setState(() {
+                        _profileImage = File(pickedFile.path);
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
     );
-
-    if (pickedFile != null) {
-      setState(() {
-        _profileImage = File(pickedFile.path); // just preview
-      });
-    }
   }
 
   Widget buildRequiredLabel(String label) {
@@ -246,77 +303,72 @@ class _SignupScreenState extends State<SignupScreen> {
         imageFile,
         "api/users/profile-image",
       );
-      return relativePath; // ✅ relative path only
+      return relativePath;
     } catch (e) {
       print("Image upload error: $e");
       return null;
     }
   }
 
-//fetch the data based on pincode
-Future<void> _fetchAddressFromPincode(String pincode) async {
-  if (pincode.length != 6) return;
+  Future<void> _fetchAddressFromPincode(String pincode) async {
+    if (pincode.length != 6) return;
 
-  try {
-    final response = await http.get(
-      Uri.parse('https://api.postalpincode.in/pincode/$pincode'),
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.postalpincode.in/pincode/$pincode'),
+      );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
 
-      
-      if (data != null &&
-          data is List &&
-          data.isNotEmpty &&
-          data[0]['Status'] == 'Success' &&
-          data[0]['PostOffice'] != null &&
-          data[0]['PostOffice'].isNotEmpty) {
-        
-        final postOffice = data[0]['PostOffice'][0];
+        if (data != null &&
+            data is List &&
+            data.isNotEmpty &&
+            data[0]['Status'] == 'Success' &&
+            data[0]['PostOffice'] != null &&
+            data[0]['PostOffice'].isNotEmpty) {
+          final postOffice = data[0]['PostOffice'][0];
 
-        // ✅ Use Name instead of District
-        final city = postOffice['Name'] ?? '';
-        final state = postOffice['State'] ?? '';
-        final country = postOffice['Country'] ?? 'India';
+          final city = postOffice['Name'] ?? '';
+          final state = postOffice['State'] ?? '';
+          final country = postOffice['Country'] ?? 'India';
 
-        setState(() {
-          if (!_cities.contains(city) && city.isNotEmpty) {
-            _cities.add(city);
-          }
+          setState(() {
+            if (!_cities.contains(city) && city.isNotEmpty) {
+              _cities.add(city);
+            }
+            if (!_states.contains(state) && state.isNotEmpty) {
+              _states.add(state);
+            }
+            if (!_countries.contains(country) && country.isNotEmpty) {
+              _countries.add(country);
+            }
 
-          if (!_states.contains(state) && state.isNotEmpty) {
-            _states.add(state);
-          }
+            _selectedCity = city.isNotEmpty ? city : _selectedCity;
+            _selectedState = state.isNotEmpty ? state : _selectedState;
+            _selectedCountry = country.isNotEmpty ? country : _selectedCountry;
 
-          if (!_countries.contains(country) && country.isNotEmpty) {
-            _countries.add(country);
-          }
-
-          _selectedCity = city.isNotEmpty ? city : _selectedCity;
-          _selectedState = state.isNotEmpty ? state : _selectedState;
-          _selectedCountry = country.isNotEmpty ? country : _selectedCountry;
-
-          _cityError = null;
-          _stateError = null;
-          _countryError = null;
-        });
+            _cityError = null;
+            _stateError = null;
+            _countryError = null;
+          });
+        } else {
+          _showPincodeError('Invalid or not found pincode');
+        }
       } else {
-        _showPincodeError('Invalid or not found pincode');
+        _showPincodeError('Error fetching pincode: ${response.statusCode}');
       }
-    } else {
-      _showPincodeError('Error fetching pincode: ${response.statusCode}');
+    } catch (e) {
+      _showPincodeError('Failed to fetch address: $e');
     }
-  } catch (e) {
-    _showPincodeError('Failed to fetch address: $e');
   }
-}
 
-void _showPincodeError(String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
-}
+  void _showPincodeError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -324,7 +376,7 @@ void _showPincodeError(String message) {
       body: SingleChildScrollView(
         child: Form(
           key: _formKey,
-          autovalidateMode: _autoValidateMode, // Disable auto validation
+          autovalidateMode: _autoValidateMode,
           child: Column(
             children: [
               // Header
@@ -335,17 +387,16 @@ void _showPincodeError(String message) {
                   bottom: 40,
                   left: 24,
                   right: 24,
-                ), // added side padding
+                ),
                 decoration: const BoxDecoration(
-                  color: Color(0xFF3A5ED4), // Solid background color
+                  color: Color(0xFF3A5ED4),
                   borderRadius: BorderRadius.only(
                     bottomLeft: Radius.circular(30),
                     bottomRight: Radius.circular(30),
                   ),
                 ),
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start, // 👈 left align text
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Welcome to',
@@ -398,11 +449,8 @@ void _showPincodeError(String message) {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _firstNameController,
-                      textCapitalization:
-                          TextCapitalization.words, // Capitalize text
-                          inputFormatters: [
-                          CapitalizeWordsFormatter(), // <-- Added your custom formatter 
-                          ],
+                      textCapitalization: TextCapitalization.words,
+                      inputFormatters: [CapitalizeWordsFormatter()],
                       decoration: InputDecoration(
                         hintText: 'Enter first name',
                         border: OutlineInputBorder(
@@ -427,11 +475,8 @@ void _showPincodeError(String message) {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _lastNameController,
-                      textCapitalization:
-                          TextCapitalization.words, // Capitalize text
-                        inputFormatters: [
-                          CapitalizeWordsFormatter(), // <-- Added your custom formatter 
-                          ],
+                      textCapitalization: TextCapitalization.words,
+                      inputFormatters: [CapitalizeWordsFormatter()],
                       decoration: InputDecoration(
                         hintText: 'Enter last name',
                         border: OutlineInputBorder(
@@ -465,9 +510,13 @@ void _showPincodeError(String message) {
                           horizontal: 16,
                           vertical: 14,
                         ),
-                        // Remove errorText here!
                       ),
                       keyboardType: TextInputType.emailAddress,
+                      onChanged: (value) {
+                        setState(() {
+                          emailError = null;
+                        });
+                      },
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Email is required';
@@ -475,18 +524,15 @@ void _showPincodeError(String message) {
                         if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                           return 'Enter a valid email';
                         }
-                        // Show this only after backend check completed and only if error present
-                        if (emailError != null && emailError!.isNotEmpty) {
+                        if (emailError != null) {
                           return emailError;
                         }
                         return null;
                       },
                       onFieldSubmitted: (email) async {
                         await checkEmailExists(email.trim());
-                        setState(() {}); // Revalidate field after backend check
                       },
                     ),
-
                     const SizedBox(height: 20),
 
                     // Mobile Number
@@ -537,7 +583,7 @@ void _showPincodeError(String message) {
                     ),
                     const SizedBox(height: 20),
 
-                    // Alternate Mobile - Fixed Alignment
+                    // Alternate Mobile
                     const Text(
                       'Alternate mobile number',
                       style: TextStyle(
@@ -550,17 +596,14 @@ void _showPincodeError(String message) {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          height: 48, // Fixed height to match text field
+                          height: 48,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Center(
-                            child: const Text(
-                              '+91',
-                              style: TextStyle(fontSize: 16),
-                            ),
+                          child: const Center(
+                            child: Text('+91', style: TextStyle(fontSize: 16)),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -615,17 +658,14 @@ void _showPincodeError(String message) {
                     ),
                     const SizedBox(height: 20),
 
-                    // Conditional Guardian Fields
+                    // Guardian Fields (conditional)
                     if (_showGuardianFields) ...[
                       buildRequiredLabel('Guardian\'s name'),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _guardianNameController,
-                        textCapitalization:
-                            TextCapitalization.words, // Capitalize text
-                            inputFormatters: [
-                          CapitalizeWordsFormatter(), // <-- Added your custom formatter 
-                          ],
+                        textCapitalization: TextCapitalization.words,
+                        inputFormatters: [CapitalizeWordsFormatter()],
                         decoration: InputDecoration(
                           hintText: 'Enter name of guardian',
                           border: OutlineInputBorder(
@@ -646,21 +686,20 @@ void _showPincodeError(String message) {
                       ),
                       const SizedBox(height: 20),
 
-                      // Guardian Mobile - Fixed Alignment
                       buildRequiredLabel('Guardian\'s mobile number'),
                       const SizedBox(height: 8),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            height: 48, // Fixed height to match text field
+                            height: 48,
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Center(
-                              child: const Text(
+                            child: const Center(
+                              child: Text(
                                 '+91',
                                 style: TextStyle(fontSize: 16),
                               ),
@@ -730,16 +769,14 @@ void _showPincodeError(String message) {
                       ),
                       const SizedBox(height: 20),
                     ],
-                    // Address Section
+
+                    // Address
                     buildRequiredLabel('House/FlatNo.'),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _addressController,
-                      textCapitalization:
-                          TextCapitalization.words, // Capitalize text
-                          inputFormatters: [
-                          CapitalizeWordsFormatter(), // <-- Added your custom formatter 
-                          ],
+                      textCapitalization: TextCapitalization.words,
+                      inputFormatters: [CapitalizeWordsFormatter()],
                       decoration: InputDecoration(
                         hintText: 'Enter full address',
                         border: OutlineInputBorder(
@@ -754,13 +791,10 @@ void _showPincodeError(String message) {
                         if (value == null || value.isEmpty) {
                           return 'Address is required';
                         }
-
-                        // Regex: only allow letters, numbers, spaces, hyphens, and slashes
                         final pattern = RegExp(r'^[a-zA-Z0-9\s\-/]+$');
                         if (!pattern.hasMatch(value)) {
                           return 'Invalid characters in address';
                         }
-
                         return null;
                       },
                       maxLines: 2,
@@ -768,134 +802,6 @@ void _showPincodeError(String message) {
                     const SizedBox(height: 20),
 
                     // City and State Row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              buildRequiredLabel('City'),
-                              const SizedBox(height: 8),
-                              DropdownMenu<String>(
-                                initialSelection: _selectedCity,
-                                expandedInsets: EdgeInsets.zero,
-                                inputDecorationTheme: InputDecorationTheme(
-                                  hintStyle: const TextStyle(
-                                    color: Colors.grey,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 4,
-                                  ),
-                                ),
-                                hintText: 'Select city',
-                                dropdownMenuEntries: _cities.map((
-                                  String value,
-                                ) {
-                                  return DropdownMenuEntry<String>(
-                                    value: value,
-                                    label: value,
-                                  );
-                                }).toList(),
-                                onSelected: (newValue) {
-                                  setState(() {
-                                    _selectedCity = newValue;
-                                    _cityError = null;
-                                  });
-                                },
-                                menuStyle: MenuStyle(
-                                  alignment: AlignmentDirectional.bottomStart,
-                                  maximumSize: MaterialStateProperty.all<Size>(
-                                    const Size.fromHeight(200),
-                                  ),
-                                ),
-                              ),
-                              if (_cityError != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: 4,
-                                    left: 4,
-                                  ),
-                                  child: Text(
-                                    _cityError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              buildRequiredLabel('State'),
-                              const SizedBox(height: 8),
-                              DropdownMenu<String>(
-                                initialSelection: _selectedState,
-                                expandedInsets: EdgeInsets.zero,
-                                inputDecorationTheme: InputDecorationTheme(
-                                  hintStyle: const TextStyle(
-                                    color: Colors.grey,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 4,
-                                  ),
-                                ),
-                                hintText: 'Select state',
-                                dropdownMenuEntries: _states.map((
-                                  String value,
-                                ) {
-                                  return DropdownMenuEntry<String>(
-                                    value: value,
-                                    label: value,
-                                  );
-                                }).toList(),
-                                onSelected: (newValue) {
-                                  setState(() {
-                                    _selectedState = newValue;
-                                    _stateError = null;
-                                  });
-                                },
-                                menuStyle: MenuStyle(
-                                  alignment: AlignmentDirectional.bottomStart,
-                                  maximumSize: MaterialStateProperty.all<Size>(
-                                    const Size.fromHeight(200),
-                                  ),
-                                ),
-                              ),
-                              if (_stateError != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: 4,
-                                    left: 4,
-                                  ),
-                                  child: Text(
-                                    _stateError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Pincode and Country Row
                     Row(
                       children: [
                         Expanded(
@@ -938,6 +844,122 @@ void _showPincodeError(String message) {
                           ),
                         ),
                         const SizedBox(width: 16),
+
+                        // CITY
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              buildRequiredLabel('City'),
+                              const SizedBox(height: 8),
+                              DropdownMenu<String>(
+                                initialSelection: _selectedCity,
+                                expandedInsets: EdgeInsets.zero,
+                                inputDecorationTheme: InputDecorationTheme(
+                                  hintStyle: const TextStyle(
+                                    color: Colors.grey,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
+                                  ),
+                                ),
+                                hintText: 'Select city',
+                                dropdownMenuEntries: _cities.map((value) {
+                                  return DropdownMenuEntry<String>(
+                                    value: value,
+                                    label: value,
+                                  );
+                                }).toList(),
+                                onSelected: (newValue) {
+                                  setState(() {
+                                    _selectedCity = newValue;
+                                    _cityError = null;
+                                  });
+                                },
+                              ),
+                              if (_cityError != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: 4,
+                                    left: 4,
+                                  ),
+                                  child: Text(
+                                    _cityError!,
+                                    style: const TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 🔹 Row 2 → STATE + COUNTRY
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              buildRequiredLabel('State'),
+                              const SizedBox(height: 8),
+                              DropdownMenu<String>(
+                                initialSelection: _selectedState,
+                                expandedInsets: EdgeInsets.zero,
+                                inputDecorationTheme: InputDecorationTheme(
+                                  hintStyle: const TextStyle(
+                                    color: Colors.grey,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
+                                  ),
+                                ),
+                                hintText: 'Select state',
+                                dropdownMenuEntries: _states.map((value) {
+                                  return DropdownMenuEntry<String>(
+                                    value: value,
+                                    label: value,
+                                  );
+                                }).toList(),
+                                onSelected: (newValue) {
+                                  setState(() {
+                                    _selectedState = newValue;
+                                    _stateError = null;
+                                  });
+                                },
+                              ),
+                              if (_stateError != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: 4,
+                                    left: 4,
+                                  ),
+                                  child: Text(
+                                    _stateError!,
+                                    style: const TextStyle(
+                                      color: Colors.red,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -960,9 +982,7 @@ void _showPincodeError(String message) {
                                   ),
                                 ),
                                 hintText: 'Select country',
-                                dropdownMenuEntries: _countries.map((
-                                  String value,
-                                ) {
+                                dropdownMenuEntries: _countries.map((value) {
                                   return DropdownMenuEntry<String>(
                                     value: value,
                                     label: value,
@@ -974,12 +994,6 @@ void _showPincodeError(String message) {
                                     _countryError = null;
                                   });
                                 },
-                                menuStyle: MenuStyle(
-                                  alignment: AlignmentDirectional.bottomStart,
-                                  maximumSize: MaterialStateProperty.all<Size>(
-                                    const Size.fromHeight(200),
-                                  ),
-                                ),
                               ),
                               if (_countryError != null)
                                 Padding(
@@ -1000,13 +1014,12 @@ void _showPincodeError(String message) {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
 
-                    // Profile Picture Upload
+                    // ✅ Profile Picture Upload with Camera + Gallery
                     buildRequiredLabel('Upload Profile Picture'),
                     const SizedBox(height: 8),
                     GestureDetector(
-                      onTap: _pickImage, // ✅ only previews image now
+                      onTap: _pickImage,
                       child: Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
@@ -1025,28 +1038,40 @@ void _showPincodeError(String message) {
                                 ),
                               )
                             : const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16),
+                                padding: EdgeInsets.symmetric(vertical: 24),
                                 child: Column(
                                   children: [
-                                    Icon(
-                                      Icons.camera_alt,
-                                      size: 40,
-                                      color: Colors.grey,
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.camera_alt,
+                                          size: 32,
+                                          color: Colors.grey,
+                                        ),
+                                        SizedBox(width: 16),
+                                        Icon(
+                                          Icons.photo_library,
+                                          size: 32,
+                                          color: Colors.grey,
+                                        ),
+                                      ],
                                     ),
-                                    SizedBox(height: 8),
+                                    SizedBox(height: 10),
                                     Text(
-                                      'Upload profile picture',
+                                      'Tap to upload via Camera or Gallery',
                                       textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.grey),
                                     ),
                                   ],
                                 ),
                               ),
                       ),
                     ),
-
                     const SizedBox(height: 30),
 
-                    // ✅ Next Button
+                    // Next Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -1054,7 +1079,7 @@ void _showPincodeError(String message) {
                           setState(() {
                             _autoValidateMode = AutovalidateMode.always;
                           });
-                          // Validate dropdowns manually
+
                           bool dropdownsValid = true;
                           setState(() {
                             _cityError = _selectedCity == null
@@ -1072,27 +1097,16 @@ void _showPincodeError(String message) {
                                 _countryError == null;
                           });
 
-                          // Check email again if not checked
-                          if (_emailController.text.isNotEmpty &&
-                              emailError == null) {
-                            await checkEmailExists(
-                              _emailController.text.trim(),
-                            );
+                          await checkEmailExists(_emailController.text.trim());
+
+                          if (emailError != null) {
+                            _formKey.currentState!.validate();
+                            return;
                           }
 
-                          // Run all form field validators
                           if (_formKey.currentState!.validate() &&
                               dropdownsValid &&
                               emailError == null) {
-                            // Extra check for email already registered
-                            if (emailError != null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(emailError!)),
-                              );
-                              return;
-                            }
-
-                            // Profile picture required
                             if (_profileImage == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -1104,7 +1118,6 @@ void _showPincodeError(String message) {
                               return;
                             }
 
-                            // ✅ Upload profile photo first
                             String? uploadedPath;
                             try {
                               uploadedPath = await _uploadProfileImage(
@@ -1128,7 +1141,6 @@ void _showPincodeError(String message) {
                               return;
                             }
 
-                            // ✅ Navigate to SignupScreenPart2 with all collected data
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -1150,12 +1162,11 @@ void _showPincodeError(String message) {
                                   state: _selectedState ?? '',
                                   country: _selectedCountry ?? '',
                                   pincode: _pincodeController.text.trim(),
-                                   profilePhoto: uploadedPath,
+                                  profilePhoto: uploadedPath,
                                 ),
                               ),
                             );
                           } else {
-                            // Show error if any required field is missing
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(

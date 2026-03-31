@@ -1,3 +1,4 @@
+//final updated
 import 'package:flutter/material.dart';
 import '../models/announcement_model.dart';
 import '../services/announcement_service.dart';
@@ -43,7 +44,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   Future<List<Announcement>> _loadAnnouncements() async {
     try {
-      final announcements = await AnnouncementService.fetchAnnouncements();
+      final announcements = await AnnouncementService.fetchAnnouncements(
+        widget.user.id!,
+      );
       final seenIds = await InboxService.fetchSeenAnnouncementIds(
         widget.user.id!,
       );

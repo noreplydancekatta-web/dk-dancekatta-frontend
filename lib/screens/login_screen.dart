@@ -57,11 +57,13 @@ class _LoginScreenState extends State<LoginScreen> {
         // ✅ Check if email already exists in DB
         final isRegistered = await _authService.isEmailRegistered(email);
 
-        Navigator.pushReplacement(
+        Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                LoginWithOTPScreen(email: email, isNewUser: !isRegistered),
+            builder: (context) => LoginWithOTPScreen(
+              email: email,
+              isNewUser: !isRegistered, // pass flag
+            ),
           ),
         );
       } else {
@@ -83,10 +85,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = true);
 
     try {
-      // 🔹 Reset GoogleSignIn and FirebaseAuth state
-      await _googleSignIn.disconnect().catchError((_) {});
-      await _googleSignIn.signOut().catchError((_) {});
-      await _auth.signOut().catchError((_) {});
+      // // 🔹 Reset GoogleSignIn and FirebaseAuth state
+      // await _googleSignIn.disconnect().catchError((_) {});
+      // await _googleSignIn.signOut().catchError((_) {});
+      // await _auth.signOut().catchError((_) {});
 
       // 🔹 Begin the Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -117,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (firebaseUser == null) {
         throw Exception("Firebase user is null");
       }
-      final photoUrl = firebaseUser.photoURL;
+
       // 🔹 Call backend (check or create user automatically)
       try {
         final response = await http.post(
@@ -126,20 +128,50 @@ class _LoginScreenState extends State<LoginScreen> {
           body: jsonEncode({
             "email": firebaseUser.email,
             "name": firebaseUser.displayName,
-            "photoURL": photoUrl, // ✅ ADD THIS
           }),
         );
 
-        if (response.statusCode == 200 || response.statusCode == 201) {
+        // if (response.statusCode == 200) {
+        //   final data = jsonDecode(response.body);
+
+        //   // ✅ Always take user object, ignore "exists"
+        //   final userModel = UserModel.fromJson(data["user"]);
+
+        //   // 🚨 Check if disabled
+        //   if (userModel.status == "Disabled") {
+        //     ScaffoldMessenger.of(context).showSnackBar(
+        //       const SnackBar(
+        //         content: Text(
+        //           "This account has been disabled by the admin. Please try another email or contact support.",
+        //         ),
+        //         backgroundColor: Colors.red,
+        //       ),
+        //     );
+        //     return; // stop login
+        //   }
+
+        if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
+          print("Backend Response: $data");
+          // ✅ Handle both cases (with "user" key or direct object)
+          final userData = data["user"] ?? data;
+          if (userData == null) {
+            throw Exception("User data missing in backend response");
+          }
 
-          final userModel = UserModel.fromJson(data["user"]);
+          final userModel = UserModel.fromJson(userData);
 
+          // 🚨 Check if disabled
           if (userModel.status == "Disabled") {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("This account has been disabled.")),
+              const SnackBar(
+                content: Text(
+                  "This account has been disabled by the admin. Please try another email or contact support.",
+                ),
+                backgroundColor: Colors.red,
+              ),
             );
-            return;
+            return; // stop login
           }
 
           await SessionManager.saveUserSession(userModel.id ?? '');

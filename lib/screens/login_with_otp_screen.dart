@@ -1,5 +1,5 @@
 // ✅ login_with_otp_screen.dart
-
+//final updated
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -44,9 +44,9 @@ class _LoginWithOTPScreenState extends State<LoginWithOTPScreen> {
     );
 
     if (response.statusCode == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP resent successfully!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('OTP resent successfully!')));
     } else {
       final body = jsonDecode(response.body);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -102,7 +102,9 @@ class _LoginWithOTPScreenState extends State<LoginWithOTPScreen> {
         await prefs.setString('userEmail', userJson['email']);
         await prefs.setString('userFirstName', userJson['firstName'] ?? '');
         await prefs.setString('userLastName', userJson['lastName'] ?? '');
-        await SessionManager.saveUserSession(userJson['_id']); // ✅ auto-login session
+        await SessionManager.saveUserSession(
+          userJson['_id'],
+        ); // ✅ auto-login session
 
         Navigator.pushReplacementNamed(
           context,
@@ -157,7 +159,10 @@ class _LoginWithOTPScreenState extends State<LoginWithOTPScreen> {
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -198,7 +203,10 @@ class _LoginWithOTPScreenState extends State<LoginWithOTPScreen> {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }
@@ -215,7 +223,10 @@ class _LoginWithOTPScreenState extends State<LoginWithOTPScreen> {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         suffixIcon: TextButton(
           onPressed: resendOTP,
           child: const Text('Resend OTP', style: TextStyle(color: Colors.blue)),

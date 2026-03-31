@@ -77,6 +77,92 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSubmitting = false;
   final _formKey = GlobalKey<FormState>();
 
+  // ─────────────────────────────────────────
+  // 📷 Show bottom sheet: Camera or Gallery
+  // ─────────────────────────────────────────
+  Future<void> _pickProfileImage() async {
+    final source = await _showImageSourceSheet();
+    if (source == null) return;
+
+    final pickedFile = await ImagePicker().pickImage(source: source);
+    if (pickedFile == null) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      String relativePath = await UploadService.uploadImage(
+        File(pickedFile.path),
+        "api/users/profile-image",
+      );
+      setState(() => _profilePhoto = relativePath);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile image uploaded successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to upload image. Try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isSubmitting = false);
+    }
+  }
+
+  /// Shows a bottom sheet asking the user to choose Camera or Gallery.
+  /// Returns the chosen [ImageSource] or null if dismissed.
+  Future<ImageSource?> _showImageSourceSheet() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Select Image Source',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF3A5ED4),
+                  child: Icon(Icons.camera_alt, color: Colors.white),
+                ),
+                title: const Text('Take a Photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF3A5ED4),
+                  child: Icon(Icons.photo_library, color: Colors.white),
+                ),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Check if user is 18 years or older
   bool get _isUserAdult {
     if (_dobController.text.isEmpty) return true;
@@ -310,7 +396,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _spacedField(Widget child) =>
       Padding(padding: const EdgeInsets.only(bottom: 12), child: child);
 
-  // ✅ Required label with red * mark
   Widget _requiredLabel(String text) {
     return RichText(
       text: TextSpan(
@@ -457,7 +542,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _updateProfile() async {
     if (_isSubmitting) return;
 
-    // 1️⃣ Validate form
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -468,7 +552,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    // 2️⃣ Validate profile photo
     if (_profilePhoto == null || _profilePhoto!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -479,7 +562,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    // 3️⃣ Validate professional choreographer selection
     if (_isProfessional == null || _isProfessional!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -492,7 +574,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    // 4️⃣ Validate experience if professional
     if (_isProfessional == 'Yes' && _experienceController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -505,7 +586,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    // 5️⃣ Skill validation
     for (int i = 0; i < _skills.length; i++) {
       final style = _skills[i]['style'];
       final level = _skills[i]['level'];
@@ -611,71 +691,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      // ✅ Profile Photo with red * indicator
+                      // ─────────────────────────────────────────
+                      // 📷 Profile Photo (Camera + Gallery)
+                      // ─────────────────────────────────────────
                       GestureDetector(
-                        onTap: () async {
-                          final pickedFile = await ImagePicker().pickImage(
-                            source: ImageSource.gallery,
-                          );
-                          if (pickedFile == null) return;
-
-                          setState(() => _isSubmitting = true);
-
-                          try {
-                            String relativePath =
-                                await UploadService.uploadImage(
-                                  File(pickedFile.path),
-                                  "api/users/profile-image",
-                                );
-                            setState(() => _profilePhoto = relativePath);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Profile image uploaded successfully!',
-                                ),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          } catch (e) {
-                            print("Image upload error: $e");
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Failed to upload image. Try again.',
-                                ),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          } finally {
-                            setState(() => _isSubmitting = false);
-                          }
-                        },
+                        onTap: _pickProfileImage,
                         child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 55,
-                              backgroundColor: Colors.grey[200],
-                              backgroundImage:
-                                  (_profilePhoto != null &&
-                                      _profilePhoto!.isNotEmpty &&
-                                      !_isSubmitting)
-                                  ? NetworkImage(getFullImageUrl(_profilePhoto))
-                                  : null,
-                              child: _isSubmitting
-                                  ? const CircularProgressIndicator(
-                                      color: Colors.blue,
-                                    )
-                                  : (_profilePhoto == null ||
-                                            _profilePhoto!.isEmpty
-                                        ? const Icon(
-                                            Icons.person,
-                                            size: 55,
-                                            color: Colors.grey,
-                                          )
-                                        : null),
+                            Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                CircleAvatar(
+                                  radius: 55,
+                                  backgroundColor: Colors.grey[200],
+                                  backgroundImage:
+                                      (_profilePhoto != null &&
+                                          _profilePhoto!.isNotEmpty &&
+                                          !_isSubmitting)
+                                      ? NetworkImage(
+                                          getFullImageUrl(_profilePhoto),
+                                        )
+                                      : null,
+                                  child: _isSubmitting
+                                      ? const CircularProgressIndicator(
+                                          color: Colors.blue,
+                                        )
+                                      : (_profilePhoto == null ||
+                                                _profilePhoto!.isEmpty
+                                            ? const Icon(
+                                                Icons.person,
+                                                size: 55,
+                                                color: Colors.grey,
+                                              )
+                                            : null),
+                                ),
+                                // Camera badge
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF3A5ED4),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 6),
-                            // ✅ Red * label below avatar
                             RichText(
                               text: const TextSpan(
                                 text: 'Profile Photo',
@@ -692,6 +757,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     ),
                                   ),
                                 ],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Tap to change (Camera or Gallery)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.black38,
                               ),
                             ),
                           ],

@@ -7,6 +7,13 @@ class PaymentScreen extends StatefulWidget {
   final String? userEmail;
   final String? userContact;
   final String? userName;
+  final String? batchName;
+  final String? branchName; // ✅ ADDED
+  final String? batchStartDate;
+  final String? studentId;
+  final String? studentName;
+  final String? batchId;
+  final String? studioName;
 
   const PaymentScreen({
     Key? key,
@@ -14,6 +21,13 @@ class PaymentScreen extends StatefulWidget {
     this.userEmail,
     this.userContact,
     this.userName,
+    this.batchName,
+    this.branchName, // ✅ ADDED
+    this.batchStartDate,
+    this.studentId,
+    this.studentName,
+    this.batchId,
+    this.studioName,
   }) : super(key: key);
 
   @override
@@ -40,12 +54,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     setState(() => _isLoading = true);
-    
+
     try {
       final isVerified = await _razorpayService.verifyPayment(
         orderId: response.orderId!,
         paymentId: response.paymentId!,
         signature: response.signature!,
+        studentId: widget.studentId ?? '',
+        studentName: widget.studentName ?? widget.userName ?? '', // ✅ fallback
+        batchId: widget.batchId ?? '',
+        batchName: widget.batchName ?? '', // ✅ ADDED
+        branchName: widget.branchName ?? '', // ✅ ADDED
+        studioName: widget.studioName ?? '',
+        userEmail: widget.userEmail ?? '',
+        amount: widget.amount,
       );
 
       setState(() => _isLoading = false);
@@ -70,10 +92,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     try {
       final orderData = await _razorpayService.createOrder(widget.amount);
-      
+
       if (orderData['success']) {
         setState(() => _isLoading = false);
-        
+
         _razorpayService.startPayment(
           orderId: orderData['order_id'],
           amount: widget.amount,
@@ -98,13 +120,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.check_circle, color: Colors.green, size: 50),
-        title: const Text('Payment Successful!'),
-        content: Text('Payment ID: $paymentId'),
+        title: const Text('Enrollment Successful! 🎉'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Payment ID: $paymentId'),
+            const SizedBox(height: 8),
+            if (widget.batchName != null) Text('Batch: ${widget.batchName}'),
+            if (widget.branchName != null) Text('Branch: ${widget.branchName}'),
+            const SizedBox(height: 8),
+            if (widget.userEmail != null)
+              Text(
+                'A confirmation email has been sent to ${widget.userEmail}',
+                style: const TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              Navigator.of(context).pop(true); // Return success
+              Navigator.of(context).pop(true);
             },
             child: const Text('OK'),
           ),
@@ -148,8 +185,31 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Icon(Icons.payment, size: 60, color: Color(0xFF3A5ED4)),
+                    const Icon(
+                      Icons.payment,
+                      size: 60,
+                      color: Color(0xFF3A5ED4),
+                    ),
                     const SizedBox(height: 20),
+                    if (widget.batchName != null) ...[
+                      Text(
+                        widget.batchName!,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    if (widget.branchName != null) ...[
+                      Text(
+                        'Branch: ${widget.branchName!}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     Text(
                       'Amount to Pay',
                       style: Theme.of(context).textTheme.titleLarge,
@@ -157,10 +217,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     const SizedBox(height: 10),
                     Text(
                       '₹${widget.amount.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: const Color(0xFF3A5ED4),
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(
+                            color: const Color(0xFF3A5ED4),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 30),
                     SizedBox(
@@ -173,10 +234,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           foregroundColor: Colors.white,
                         ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
                             : const Text(
                                 'Pay Now',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                       ),
                     ),

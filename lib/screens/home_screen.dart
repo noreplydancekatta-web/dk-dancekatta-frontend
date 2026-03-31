@@ -103,7 +103,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkUnseenMessages() async {
     try {
-      final announcements = await AnnouncementService.fetchAnnouncements();
+      final announcements = await AnnouncementService.fetchAnnouncements(
+        _currentUser.id!,
+      );
       final seenIds = await InboxService.fetchSeenAnnouncementIds(
         _currentUser.id!,
       );
