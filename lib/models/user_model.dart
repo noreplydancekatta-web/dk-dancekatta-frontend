@@ -139,29 +139,57 @@ class UserModel {
 
   // ✅ FROM JSON
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final firstName = json['firstName'] ?? '';
+    final lastName = json['lastName'] ?? '';
+    final mobile = json['mobile'] ?? '';
+    final email = json['email'] ?? '';
+    final profilePhoto = json['profilePhoto'];
+    final dateOfBirth = json['dateOfBirth'];
+    final address = json['address'];
+    final city = json['city'] ?? '';
+    final state = json['state'] ?? '';
+    final country = json['country'];
+    final pincode = json['pincode'];
+    final isProfessional = json['isProfessional'];
+
+    // ✅ Compute locally — no backend dependency
+    final isProfileFullyComplete =
+        firstName.isNotEmpty &&
+        lastName.isNotEmpty &&
+        mobile.isNotEmpty &&
+        email.isNotEmpty &&
+        (profilePhoto != null && profilePhoto.toString().isNotEmpty) &&
+        (dateOfBirth != null && dateOfBirth.toString().isNotEmpty) &&
+        (address != null && address.toString().isNotEmpty) &&
+        city.isNotEmpty &&
+        state.isNotEmpty &&
+        (country != null && country.toString().isNotEmpty) &&
+        (pincode != null && pincode.toString().isNotEmpty) &&
+        (isProfessional != null && isProfessional.toString().isNotEmpty);
+
     return UserModel(
       id: json['_id'] ?? json['id'],
-      firstName: json['firstName'] ?? '',
-      lastName: json['lastName'] ?? '',
-      mobile: json['mobile'] ?? '',
-      email: json['email'] ?? '',
-      profilePhoto: json['profilePhoto'],
+      firstName: firstName,
+      lastName: lastName,
+      mobile: mobile,
+      email: email,
+      profilePhoto: profilePhoto,
       altMobile: json['altMobile'],
-      dateOfBirth: json['dateOfBirth'],
+      dateOfBirth: dateOfBirth,
       guardianName: json['guardianName'],
       guardianMobile: json['guardianMobile'],
       guardianEmail: json['guardianEmail'],
-      address: json['address'],
-      city: json['city'] ?? '',
-      state: json['state'] ?? '',
-      country: json['country'],
-      pincode: json['pincode'],
+      address: address,
+      city: city,
+      state: state,
+      country: country,
+      pincode: pincode,
       youtube: json['youtube'],
       facebook: json['facebook'],
       instagram: json['instagram'],
-      isProfessional: json['isProfessional'],
+      isProfessional: isProfessional,
       isProfessionalChoreographer:
-          json['isProfessional'] == 'Yes' ||
+          isProfessional == 'Yes' ||
           json['isProfessionalChoreographer'] == true,
       experience: json['experience'],
       skills: json['skills'] != null
@@ -171,7 +199,7 @@ class UserModel {
       isStudioOwner: json['isStudioOwner'],
       studioCreated: json['studioCreated'],
       status: json['status'],
-      isProfileFullyComplete: json['isProfileComplete'] ?? false,
+      isProfileFullyComplete: isProfileFullyComplete, // ✅ computed locally
     );
   }
 

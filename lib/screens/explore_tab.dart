@@ -69,7 +69,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   List<String> _daysList = ['Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat', 'Sun'];
 
-  late Future<List<DanceClass>> _danceClassesFuture;
+  Future<List<DanceClass>> _danceClassesFuture = Future.value([]);
 
   final String baseUrl = 'http://147.93.19.17:5002';
 

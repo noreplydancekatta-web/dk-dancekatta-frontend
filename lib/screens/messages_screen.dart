@@ -1,4 +1,3 @@
-//final updated
 import 'package:flutter/material.dart';
 import '../models/announcement_model.dart';
 import '../services/announcement_service.dart';
@@ -18,7 +17,6 @@ class MessagesScreen extends StatefulWidget {
 
 class _MessagesScreenState extends State<MessagesScreen> {
   late Future<List<Announcement>> _announcementsFuture;
-  List<Announcement> _announcements = [];
   Timer? _autoRefreshTimer;
 
   @override
@@ -26,13 +24,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
     super.initState();
     _announcementsFuture = _loadAnnouncements();
 
-    // Auto-refresh every 30 seconds
+    // Auto refresh every 30 seconds
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
         setState(() {
           _announcementsFuture = _loadAnnouncements();
         });
       }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant MessagesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-fetch whenever this tab is revisited (triggered by HomeScreen rebuilding tabs)
+    setState(() {
+      _announcementsFuture = _loadAnnouncements();
     });
   }
 
@@ -44,33 +51,41 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   Future<List<Announcement>> _loadAnnouncements() async {
     try {
-      final announcements = await AnnouncementService.fetchAnnouncements(
-        widget.user.id!,
-      );
-      final seenIds = await InboxService.fetchSeenAnnouncementIds(
-        widget.user.id!,
-      );
+      // Fetch announcements — if this fails, propagate the error
+      final announcements =
+          await AnnouncementService.fetchAnnouncements(widget.user.id!);
+
+      // Fetch seen IDs separately — if this fails, just treat all as unseen
+      List<String> seenIds = [];
+      try {
+        seenIds = await InboxService.fetchSeenAnnouncementIds(widget.user.id!);
+      } catch (e) {
+        debugPrint("Warning: Could not fetch seen IDs, treating all as unseen: $e");
+      }
 
       for (var a in announcements) {
         a.isSeen = seenIds.contains(a.id);
       }
 
-      // ✅ This block already exists — just add the ONE new line inside it
+      // Mark unseen announcements as seen in background
       Future.delayed(Duration.zero, () async {
         for (var a in announcements) {
           if (!a.isSeen) {
-            await InboxService.markAsSeen(widget.user.id!, a.id);
-            debugPrint("✅ Marked as seen: ${a.id}");
+            try {
+              await InboxService.markAsSeen(widget.user.id!, a.id);
+              debugPrint("Marked as seen: ${a.id}");
+            } catch (e) {
+              debugPrint("Warning: Could not mark as seen: ${a.id} - $e");
+            }
           }
         }
-        hasNewMessages.value = false; // ← ADD THIS LINE HERE
+        hasNewMessages.value = false;
       });
 
-      _announcements = announcements;
       return announcements;
     } catch (e) {
-      debugPrint('❌ Error loading announcements: $e');
-      rethrow;
+      debugPrint("Error loading announcements: $e");
+      return [];
     }
   }
 
@@ -78,7 +93,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
     setState(() {
       _announcementsFuture = _loadAnnouncements();
     });
-    await _announcementsFuture;
   }
 
   String formatTimeAgo(DateTime createdAt) {
@@ -86,10 +100,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
     final diff = DateTime.now().difference(localTime);
 
     if (diff.inMinutes < 1) return "Just now";
-    if (diff.inMinutes < 60) return "${diff.inMinutes} Minutes ago";
-    if (diff.inHours < 24) return "${diff.inHours} Hours ago";
-    if (diff.inDays == 1) return "1 Day ago";
-    return "${diff.inDays} Days ago";
+    if (diff.inMinutes < 60) return "${diff.inMinutes} minutes ago";
+    if (diff.inHours < 24) return "${diff.inHours} hours ago";
+    if (diff.inDays == 1) return "1 day ago";
+    return "${diff.inDays} days ago";
   }
 
   Widget buildCard(Announcement a) {
@@ -115,10 +129,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
         children: [
           Text(
             a.title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
-          const SizedBox(height: 6),
-
           const SizedBox(height: 6),
           Text(a.message),
           const SizedBox(height: 10),
@@ -134,101 +149,119 @@ class _MessagesScreenState extends State<MessagesScreen> {
     );
   }
 
+  void goHome() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HomeScreen(user: widget.user),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Messages', style: TextStyle(color: Colors.black)),
-        centerTitle: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    HomeScreen(user: widget.user), // 👈 Navigate to HomeScreen
-              ),
-            );
-          },
-        ),
-
+    return WillPopScope(
+      onWillPop: () async {
+        goHome(); // mobile back button
+        return false;
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-      ),
+        appBar: AppBar(
+          title: const Text(
+            "Messages",
+            style: TextStyle(color: Colors.black),
+          ),
+          centerTitle: false,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: goHome, // arrow back button
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: FutureBuilder<List<Announcement>>(
+            future: _announcementsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: FutureBuilder<List<Announcement>>(
-          future: _announcementsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}"));
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              if (snapshot.hasError) {
+                return Center(child: Text("Error: ${snapshot.error}"));
+              }
+
+              final announcements = snapshot.data ?? [];
+
+              if (announcements.isEmpty) {
+                return RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 200),
+                      Center(
+                        child: Text(
+                          "No announcements available",
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final now = DateTime.now();
+
+              final today = announcements.where((a) {
+                final created = DateTime.parse(a.createdAt).toLocal();
+                return now.difference(created).inHours < 24;
+              }).toList();
+
+              final older = announcements.where((a) {
+                final created = DateTime.parse(a.createdAt).toLocal();
+                return now.difference(created).inHours >= 24;
+              }).toList();
+
               return RefreshIndicator(
                 onRefresh: _refresh,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 200),
-                    Center(
-                      child: Text(
-                        "No announcements available",
-                        style: TextStyle(fontSize: 16),
+                  children: [
+                    const SizedBox(height: 10),
+
+                    if (today.isNotEmpty) ...[
+                      const Text(
+                        "Today",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      ...today.map(buildCard),
+                    ],
+
+                    const SizedBox(height: 10),
+
+                    if (older.isNotEmpty) ...[
+                      const Text(
+                        "Older",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...older.map(buildCard),
+                    ],
                   ],
                 ),
               );
-            }
-
-            final now = DateTime.now();
-            final today = _announcements.where((a) {
-              final created = DateTime.parse(a.createdAt).toLocal();
-              return now.difference(created).inHours < 24;
-            }).toList();
-
-            final older = _announcements.where((a) {
-              final created = DateTime.parse(a.createdAt).toLocal();
-              return now.difference(created).inHours >= 24;
-            }).toList();
-
-            return RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  const SizedBox(height: 10),
-                  if (today.isNotEmpty) ...[
-                    const Text(
-                      "Today",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...today.map(buildCard),
-                  ],
-                  const SizedBox(height: 10),
-                  if (older.isNotEmpty) ...[
-                    const Text(
-                      "Older",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...older.map(buildCard),
-                  ],
-                ],
-              ),
-            );
-          },
+            },
+          ),
         ),
       ),
     );

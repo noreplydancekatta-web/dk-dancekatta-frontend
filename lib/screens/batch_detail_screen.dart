@@ -112,18 +112,11 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
   }
 
   void _handleStudioDeleted() {
+    if (!mounted) return;
     setState(() {
       isStudioDeleted = true;
       isLoadingStudio = false;
     });
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('This batch is no longer available')),
-    );
-
-    Navigator.pop(context);
   }
 
   Future<void> getLoggedInUserId() async {
@@ -555,7 +548,12 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
     double gst = (convenienceFee * gstPercent) / 100;
     double totalFee = discountedTutorFee + convenienceFee + gst;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) Navigator.of(context).pop();
+      },
+      child: Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -566,7 +564,7 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
 
@@ -824,7 +822,8 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
           ],
         ),
       ),
-    );
+    ), // closes Scaffold
+    ); // closes PopScope
   }
 
   // ✅ FLOATING PAY BUTTON
@@ -984,12 +983,9 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
           });
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('This batch is no longer available'),
-              ),
-            );
-            Navigator.pop(context);
+            setState(() {
+              isBatchDeleted = true;
+            });
           }
           return;
         }

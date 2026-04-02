@@ -38,6 +38,17 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
   // Add a variable to hold the latest studio data
   late StudioModel currentStudio;
 
+  void _openPhotoViewer(BuildContext context, List<String> photos, int initialIndex) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _PhotoViewerScreen(
+          photos: photos,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
   /// Pastel colors for initials placeholder
   final List<Color> _initialColors = [
     Color(0xFFE1BEE7), // pastel purple
@@ -459,105 +470,135 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
         },
         child: CustomScrollView(
           slivers: [
-            SliverAppBar(
-              expandedHeight: 250.0,
-              floating: false,
-              pinned: true,
-              automaticallyImplyLeading: false,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Stack(
-                  children: [
-                    PageView.builder(
-                      controller: _pageController,
-                      onPageChanged: (index) {
-                        setState(() => _currentPage = index);
-                      },
-                      itemCount: studio.studioPhotos.length,
-                      itemBuilder: (context, index) {
-                        final photoUrl = getFullImageUrl(
-                          studio.studioPhotos[index],
-                        );
-                        return Image.network(
-                          photoUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.broken_image, size: 40),
-                              ),
-                        );
-                      },
-                    ),
-                    // Optional: add dots indicator for images
-                    Positioned(
-                      bottom: 10,
-                      left: 0,
-                      right: 0,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          studio.studioPhotos.length,
-                          (index) => Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: _currentPage == index ? 10 : 6,
-                            height: _currentPage == index ? 10 : 6,
-                            decoration: BoxDecoration(
-                              color: _currentPage == index
-                                  ? Colors.white
-                                  : Colors.white54,
-                              shape: BoxShape.circle,
-                            ),
+            SliverToBoxAdapter(
+              child: studio.studioPhotos.isEmpty
+                  ? Container(
+                      height: 250,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.store, size: 60, color: Colors.grey),
+                    )
+                  : SizedBox(
+                      height: 250,
+                      child: Stack(
+                        children: [
+                          PageView.builder(
+                            controller: _pageController,
+                            onPageChanged: (index) {
+                              setState(() => _currentPage = index);
+                            },
+                            itemCount: studio.studioPhotos.length,
+                            itemBuilder: (context, index) {
+                              final photoUrl = getFullImageUrl(studio.studioPhotos[index]);
+                              return GestureDetector(
+                                onTap: () => _openPhotoViewer(
+                                  context,
+                                  studio.studioPhotos.map((p) => getFullImageUrl(p)).toList(),
+                                  index,
+                                ),
+                                child: Image.network(
+                                  photoUrl,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.broken_image, size: 40),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        ),
+                          // Dot indicators
+                          if (studio.studioPhotos.length > 1)
+                            Positioned(
+                              bottom: 12,
+                              left: 0,
+                              right: 0,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(
+                                  studio.studioPhotos.length,
+                                  (index) => AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                                    width: _currentPage == index ? 20 : 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: _currentPage == index
+                                          ? Colors.white
+                                          : Colors.white.withOpacity(0.5),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Left arrow button
+                          if (studio.studioPhotos.length > 1)
+                            Positioned(
+                              left: 8,
+                              top: 0,
+                              bottom: 0,
+                              child: Center(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (_currentPage > 0) {
+                                      _pageController.previousPage(
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                      );
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.45),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.arrow_back_ios_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Right arrow button
+                          if (studio.studioPhotos.length > 1)
+                            Positioned(
+                              right: 8,
+                              top: 0,
+                              bottom: 0,
+                              child: Center(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (_currentPage < studio.studioPhotos.length - 1) {
+                                      _pageController.nextPage(
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                      );
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.45),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-
-                    // Left arrow
-                    Positioned(
-                      left: 8,
-                      top: 0,
-                      bottom: 0,
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.arrow_back_ios,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        onPressed: () {
-                          if (_currentPage > 0) {
-                            _pageController.previousPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-                        },
-                      ),
-                    ),
-
-                    // Right arrow
-                    Positioned(
-                      right: 8,
-                      top: 0,
-                      bottom: 0,
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.arrow_forward_ios,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        onPressed: () {
-                          if (_currentPage < studio.studioPhotos.length - 1) {
-                            _pageController.nextPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
             SliverToBoxAdapter(
               child: Padding(
@@ -707,91 +748,33 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
 
                       const SizedBox(height: 20),
 
-                      // 📧 Address
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Color(0xFFE5EDF5),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.mail_outline, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              branches[selectedBranchIndex].address,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                        ],
+                      // Branch info rows
+                      _branchInfoRow(
+                        icon: Icons.location_city_outlined,
+                        text: branches[selectedBranchIndex].address,
                       ),
-
-                      const SizedBox(height: 12),
-
-                      // 📞 Contact Number
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Color(0xFFE5EDF5),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.phone, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              branches[selectedBranchIndex].contactNo ??
-                                  'Not available',
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 10),
+                      _branchInfoRow(
+                        icon: Icons.phone_outlined,
+                        text: branches[selectedBranchIndex].contactNo ?? 'Not available',
                       ),
-
-                      const SizedBox(height: 12),
-
-                      // 📍 Map Link
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Color(0xFFE5EDF5),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.location_on_outlined,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: GestureDetector(
+                      const SizedBox(height: 10),
+                      branches[selectedBranchIndex].mapLink.isNotEmpty
+                          ? GestureDetector(
                               onTap: () async {
-                                final url =
-                                    branches[selectedBranchIndex].mapLink;
+                                final url = branches[selectedBranchIndex].mapLink;
                                 final uri = Uri.parse(url);
                                 if (await launcher.canLaunchUrl(uri)) {
                                   await launcher.launchUrl(uri);
                                 }
                               },
-                              child: Text(
-                                branches[selectedBranchIndex].mapLink,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.blue,
-                                  decoration: TextDecoration.underline,
-                                ),
+                              child: _branchInfoRow(
+                                icon: Icons.map_outlined,
+                                text: 'View on Map',
+                                isLink: true,
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
+                            )
+                          : const SizedBox.shrink(),
                     ],
 
                     const SizedBox(height: 24),
@@ -1274,6 +1257,158 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _branchInfoRow({
+    required IconData icon,
+    required String text,
+    bool isLink = false,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8EEFF),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 20, color: const Color(0xFF3A5ED4)),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 15,
+              color: isLink ? const Color(0xFF3A5ED4) : Colors.black87,
+              decoration: isLink ? TextDecoration.underline : TextDecoration.none,
+              fontWeight: isLink ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Photo viewer screen
+class _PhotoViewerScreen extends StatefulWidget {
+  final List<String> photos;
+  final int initialIndex;
+  const _PhotoViewerScreen({required this.photos, required this.initialIndex});
+  @override
+  State<_PhotoViewerScreen> createState() => _PhotoViewerScreenState();
+}
+
+class _PhotoViewerScreenState extends State<_PhotoViewerScreen> {
+  late PageController _controller;
+  late int _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+    _controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _controller,
+            itemCount: widget.photos.length,
+            onPageChanged: (i) => setState(() => _current = i),
+            itemBuilder: (context, index) {
+              return InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4.0,
+                child: Center(
+                  child: Image.network(
+                    widget.photos[index],
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.broken_image,
+                      color: Colors.white54,
+                      size: 60,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          // X close button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+          // Counter  e.g. "2 / 5"
+          if (widget.photos.length > 1)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 14,
+              left: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_current + 1} / ${widget.photos.length}',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
+            ),
+          // Dot indicators
+          if (widget.photos.length > 1)
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + 20,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  widget.photos.length,
+                  (index) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: _current == index ? 20 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _current == index
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

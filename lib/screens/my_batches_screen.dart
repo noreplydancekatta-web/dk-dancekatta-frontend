@@ -4,30 +4,32 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 
 import '../models/user_model.dart';
-import '../models/batch_model.dart';
-import '../models/branch_model.dart';
-import '../constants.dart';
-import 'batch_detail_screen.dart';
 
 class MyBatchesScreen extends StatefulWidget {
   final UserModel user;
+  final VoidCallback? goToHomeTab;
 
-  const MyBatchesScreen({super.key, required this.user});
+  const MyBatchesScreen({
+    super.key,
+    required this.user,
+    this.goToHomeTab,
+  });
 
   @override
   State<MyBatchesScreen> createState() => _MyBatchesScreenState();
 }
 
 class _MyBatchesScreenState extends State<MyBatchesScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+
   bool isLoading = true;
+
   List<Map<String, dynamic>> enrolledBatches = [];
   Set<String> ratedBatchIds = {};
-  Map<String, dynamic>? platformFeeData;
+
   final String baseUrl = 'http://147.93.19.17:5002';
 
   late TabController _tabController;
@@ -36,45 +38,70 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addObserver(this);
     fetchEnrolledBatches();
-    fetchPlatformFee();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      fetchEnrolledBatches();
+    }
+  }
+
+  // Called every time this widget is re-inserted into the tree
+  // (e.g. navigating back to this tab after enrolling)
+  @override
+  void didUpdateWidget(covariant MyBatchesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    fetchEnrolledBatches();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
   }
 
-  // Filter helpers
+  // =============================
+  // FILTERS
+  // =============================
+
   List<Map<String, dynamic>> get allBatches => enrolledBatches;
 
-  List<Map<String, dynamic>> get activeBatches => enrolledBatches.where((b) {
-    final batchObj = b['batchId'];
-    final toDate = batchObj is Map ? batchObj['toDate'] : null;
+  List<Map<String, dynamic>> get activeBatches {
+    final now = DateTime.now();
+    return enrolledBatches.where((b) {
+      final endDate = DateTime.tryParse(b['toDate'] ?? '');
+      if (endDate == null) return false;
+      return endDate.isAfter(now);
+    }).toList();
+  }
 
-    final ended =
-        DateTime.tryParse(toDate ?? '')?.isBefore(DateTime.now()) ?? false;
+  List<Map<String, dynamic>> get endedBatches {
+    final now = DateTime.now();
+    return enrolledBatches.where((b) {
+      final endDate = DateTime.tryParse(b['toDate'] ?? '');
+      if (endDate == null) return false;
+      return endDate.isBefore(now);
+    }).toList();
+  }
 
-    return !ended;
-  }).toList();
+  // =============================
+  // FETCH BATCHES
+  // =============================
 
-  List<Map<String, dynamic>> get endedBatches => enrolledBatches.where((b) {
-    final batchObj = b['batchId'];
-    final toDate = batchObj is Map ? batchObj['toDate'] : null;
-
-    return DateTime.tryParse(toDate ?? '')?.isBefore(DateTime.now()) ?? false;
-  }).toList();
-
-  // 🔄 Enhanced refresh with loading state and error handling
   Future<void> fetchEnrolledBatches() async {
-    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
 
-    setState(() => isLoading = true);
     try {
       final batchRes = await http.get(
         Uri.parse('$baseUrl/api/transactions/enrolled/${widget.user.id}'),
       );
+
       final ratingRes = await http.get(
         Uri.parse('$baseUrl/api/ratings/user/${widget.user.id}'),
       );
@@ -83,78 +110,36 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
         final transactions = jsonDecode(batchRes.body);
         final ratings = jsonDecode(ratingRes.body);
 
-        if (mounted) {
-          setState(() {
-            ratedBatchIds = Set<String>.from(
-              ratings.map((r) {
-                final batchId = r['batchId'];
-                if (batchId is Map) {
-                  return batchId['_id']?.toString() ?? '';
-                } else {
-                  return batchId?.toString() ?? '';
-                }
-              }),
-            );
-            enrolledBatches = List<Map<String, dynamic>>.from(transactions);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching enrolled batches: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to refresh batches'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
+        ratedBatchIds = Set<String>.from(
+          ratings.map((r) {
+            final batchId = r['batchId'];
+            if (batchId is Map) {
+              return batchId['_id'].toString();
+            }
+            return batchId.toString();
+          }),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
-    }
-  }
 
-  Future<void> fetchPlatformFee() async {
-    try {
-      final res = await http.get(Uri.parse('$baseUrl/api/platformfees'));
-      if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
-        if (data.isNotEmpty && mounted) {
-          setState(() => platformFeeData = data.first);
-        }
+        enrolledBatches = List<Map<String, dynamic>>.from(transactions);
       }
     } catch (e) {
-      debugPrint('Error fetching platform fee: $e');
-    }
-  }
-
-  Future<void> refreshRatings() async {
-    try {
-      final ratingRes = await http.get(
-        Uri.parse('$baseUrl/api/ratings/user/${widget.user.id}'),
+      debugPrint("Fetch error $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Failed to load batches"),
+          backgroundColor: Colors.red,
+        ),
       );
-      if (ratingRes.statusCode == 200 && mounted) {
-        final ratings = jsonDecode(ratingRes.body);
-        setState(() {
-          ratedBatchIds = Set<String>.from(
-            ratings.map((r) {
-              final batchId = r['batchId'];
-              if (batchId is Map) {
-                return batchId['_id']?.toString() ?? '';
-              } else {
-                return batchId?.toString() ?? '';
-              }
-            }),
-          );
-        });
-      }
-    } catch (e) {
-      debugPrint('Error refreshing ratings: $e');
     }
+
+    setState(() {
+      isLoading = false;
+    });
   }
+
+  // =============================
+  // SUBMIT RATING
+  // =============================
 
   Future<void> submitRating(
     String studioId,
@@ -173,384 +158,216 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
         }),
       );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        setState(() => ratedBatchIds.add(batchId));
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        setState(() {
+          ratedBatchIds.add(batchId);
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Rating submitted successfully!'),
+            content: Text("Rating submitted"),
             backgroundColor: Colors.green,
           ),
         );
-        await fetchEnrolledBatches();
-        await refreshRatings();
-      } else {
-        String errorMsg = 'Failed to submit rating';
-        try {
-          final decoded = jsonDecode(response.body);
-          if (decoded is Map && decoded['message'] != null) {
-            errorMsg = decoded['message'];
-          }
-        } catch (_) {}
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(errorMsg)));
+
+        fetchEnrolledBatches();
       }
     } catch (e) {
-      debugPrint('Error submitting rating: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error submitting rating')));
+      debugPrint("Rating error $e");
     }
   }
 
-  double _parseDouble(dynamic value, [double fallback = 0.0]) {
-    if (value == null) return fallback;
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? fallback;
-    return fallback;
-  }
+  // =============================
+  // FETCH STUDIO
+  // =============================
 
   Future<Map<String, dynamic>?> fetchStudioById(String studioId) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/studios/$studioId'),
-      );
-      if (response.statusCode == 200) return jsonDecode(response.body);
+      final res = await http.get(Uri.parse('$baseUrl/api/studios/$studioId'));
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
     } catch (e) {
-      debugPrint('Error fetching studio: $e');
+      debugPrint("Studio fetch error $e");
     }
     return null;
   }
 
-  Future<Map<String, dynamic>> fetchOwner(String ownerId) async {
-    final response = await http.get(Uri.parse('$baseUrl/api/users/$ownerId'));
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    throw Exception('Failed to fetch owner');
-  }
+  // =============================
+  // GENERATE INVOICE
+  // =============================
 
   Future<void> generateInvoice(
     Map<String, dynamic> txn,
     Map<String, dynamic>? studio,
   ) async {
+    final pdf = pw.Document();
+
     final roboto = pw.Font.ttf(
       await rootBundle.load("assets/fonts/Roboto-VariableFont_wdth,wght.ttf"),
     );
-    final robotoItalic = pw.Font.ttf(
-      await rootBundle.load(
-        "assets/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf",
-      ),
-    );
 
-    final pdf = pw.Document();
-    final DateTime now = DateTime.now();
-    final DateTime paymentDate = txn['paymentDate'] != null
-        ? DateTime.tryParse(txn['paymentDate']) ?? now
-        : now;
-
-    final double tutorFee = _parseDouble(txn['fee']);
-    final double discountAmount = _parseDouble(txn['discountAmount']);
-    final double discountedTutorFee = tutorFee - discountAmount;
-    final double platformPercent = _parseDouble(
-      platformFeeData?['feePercent'],
-      0,
-    );
-    final double gstPercent = _parseDouble(platformFeeData?['gstPercent'], 0);
-    final double platformFee = (discountedTutorFee * platformPercent) / 100;
-    final double gstOnPlatformFee = (platformFee * gstPercent) / 100;
-    final double totalFee = discountedTutorFee + platformFee + gstOnPlatformFee;
-    final double totalAmountPaid = _parseDouble(txn['paymentAmount'], totalFee);
-    final String? couponCode = txn['couponCode'] as String?;
+    final now = DateTime.now();
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
-        theme: pw.ThemeData.withFont(
-          base: roboto,
-          italic: robotoItalic,
-          fontFallback: [roboto],
-        ),
-        build: (pw.Context context) {
+        theme: pw.ThemeData.withFont(base: roboto),
+        build: (context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'DanceKatta',
-                        style: pw.TextStyle(
-                          fontSize: 24,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.blue,
-                        ),
-                      ),
-                      pw.SizedBox(height: 6),
-                      pw.Text(
-                        'Studio name: ${studio?['studioName'] ?? 'DanceKatta Studio'}',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                      pw.Text(
-                        'Address: ${studio?['registeredAddress'] ?? 'Not Provided'}',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                      if (studio?['gstNumber'] != null &&
-                          studio!['gstNumber'].toString().isNotEmpty)
-                        pw.Text(
-                          'GSTIN: ${studio!['gstNumber']}',
-                          style: pw.TextStyle(fontSize: 10),
-                        ),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'INVOICE',
-                        style: pw.TextStyle(
-                          fontSize: 22,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 8),
-                      pw.Text(
-                        'Invoice Date: ${paymentDate.day}-${paymentDate.month}-${paymentDate.year}',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                      pw.Text(
-                        'Customer ID: ${widget.user.id}',
-                        style: pw.TextStyle(fontSize: 10),
-                      ),
-                      pw.Text(
-                        'PAID',
-                        style: pw.TextStyle(
-                          color: PdfColors.green,
-                          fontWeight: pw.FontWeight.bold,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              pw.Text(
+                "DanceKatta Invoice",
+                style: pw.TextStyle(
+                  fontSize: 22,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
-              // ... rest of PDF unchanged (kept for brevity)
+              pw.SizedBox(height: 10),
+              pw.Text("Customer ID: ${widget.user.id}"),
+              pw.Text("Studio: ${studio?['studioName'] ?? 'DanceKatta'}"),
+              pw.Text("Payment Date: $now"),
+              pw.SizedBox(height: 20),
+              pw.Text("Amount Paid: ₹${txn['paymentAmount']}"),
             ],
           );
         },
       ),
     );
 
-    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+    );
   }
 
-  // ── Batch list widget (reused across all tabs) ──────────────────────────
+  // =============================
+  // BATCH CARD UI
+  // =============================
+
   Widget _buildBatchList(List<Map<String, dynamic>> batches) {
     if (isLoading) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 300),
-          Center(child: CircularProgressIndicator()),
-        ],
-      );
+      return const Center(child: CircularProgressIndicator());
     }
+
     if (batches.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 200),
-          Center(
-            child: Column(
-              children: [
-                Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'No batches found',
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              ],
-            ),
-          ),
-        ],
+      return const Center(
+        child: Text(
+          "No batches found",
+          style: TextStyle(color: Colors.grey),
+        ),
       );
     }
 
     return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12),
       itemCount: batches.length,
       itemBuilder: (context, index) {
         final batch = batches[index];
+
         final batchId = batch['batchId'] is Map
             ? batch['batchId']['_id']
             : batch['batchId'];
 
-        final isRated = ratedBatchIds.contains(batchId ?? '');
-        final batchObj = batch['batchId'];
-        final toDate = batchObj is Map ? batchObj['toDate'] : null;
+        // ✅ Read toDate from top-level transaction field
+        final endDate = DateTime.tryParse(batch['toDate'] ?? '');
+        final isEnded = endDate != null && endDate.isBefore(DateTime.now());
+        final isRated = ratedBatchIds.contains(batchId?.toString() ?? '');
 
-        final isEnded =
-            DateTime.tryParse(toDate ?? '')?.isBefore(DateTime.now()) ?? false;
-        final statusText = isEnded ? 'Ended' : 'Active';
-
-        return GestureDetector(
-          onTap: () async {
-            bool dialogPopped = false;
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => const Center(child: CircularProgressIndicator()),
-            );
-
-            try {
-              final batchId = batch['batchId'] is Map
-                  ? batch['batchId']['_id']
-                  : batch['batchId'];
-
-              final response = await http.get(
-                Uri.parse('$baseUrl/api/batches'),
-              );
-
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-                dialogPopped = true;
-              }
-
-              if (response.statusCode == 200) {
-                final List data = jsonDecode(response.body);
-                final batchData = data.cast<Map<String, dynamic>>().firstWhere(
-                  (b) => b['_id'] == batchId,
-                  orElse: () => {},
-                );
-
-                if (batchData.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Batch not found'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                final batchModel = BatchModel.fromJson(batchData);
-                final branchModel = BranchModel(
-                  id: batchModel.branch,
-                  name: batch['branchName'] ?? 'Unknown Branch',
-                  address: batch['branchAddress'] ?? 'Address not available',
-                  area: '',
-                  contactNo: batch['branchContactNo'] ?? '',
-                  mapLink: '',
-                );
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => BatchDetailScreen(
-                      batch: batchModel,
-                      branch: branchModel,
-                    ),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to load batch details'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            } catch (e) {
-              if (!dialogPopped && Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  blurRadius: 6,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+
+                // ── Row 1: Title + Download button ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "${batch['style']} • ${batch['level']}",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        "${batch['style']} • ${batch['level']}",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
                     ),
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        color: isEnded ? Colors.black : Colors.blueAccent,
-                        fontWeight: FontWeight.w600,
+                    GestureDetector(
+                      onTap: () async {
+                        final studio = await fetchStudioById(
+                          batch['studioId'].toString(),
+                        );
+                        await generateInvoice(batch, studio);
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.only(left: 8),
+                        child: Icon(Icons.download, size: 22),
                       ),
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 4),
-                Text(batch['studioName'] ?? 'Studio'),
-                Text("Payment Successful ₹${batch['paymentAmount'] ?? '0'}/-"),
-                const SizedBox(height: 6),
+                Text(batch['studioName'] ?? ''),
+                Text("₹${batch['paymentAmount']} Paid"),
+                const SizedBox(height: 8),
+
+                // ── Row 2: Status badge + Rating (for ended) ──
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    // Status chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isEnded
+                            ? Colors.grey[200]
+                            : Colors.blue[50],
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isEnded ? "Ended" : "Active",
+                        style: TextStyle(
+                          color: isEnded ? Colors.black54 : Colors.blue,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+
+                    // Rating — only for ended batches
                     if (isEnded)
                       isRated
-                          ? const Text("⭐ You rated this batch")
+                          ? const Text(
+                              "⭐ Rated",
+                              style: TextStyle(fontSize: 13),
+                            )
                           : RatingBar.builder(
                               initialRating: 0,
-                              minRating: 1,
-                              direction: Axis.horizontal,
-                              itemSize: 26,
                               itemCount: 5,
-                              allowHalfRating: false,
-                              itemBuilder: (context, _) =>
-                                  const Icon(Icons.star, color: Colors.amber),
+                              itemSize: 22,
+                              itemBuilder: (_, __) => const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                              ),
                               onRatingUpdate: (rating) {
-                                final batchId = batch['batchId'] is Map
-                                    ? batch['batchId']['_id']
-                                    : batch['batchId'];
-
                                 submitRating(
                                   batch['studioId'].toString(),
                                   batchId.toString(),
                                   rating,
                                 );
                               },
-                            )
-                    else
-                      const SizedBox(),
-                    IconButton(
-                      icon: const Icon(Icons.download, size: 22),
-                      onPressed: () async {
-                        final studioData = await fetchStudioById(
-                          batch['studioId'],
-                        );
-                        await generateInvoice(batch, studioData);
-                      },
-                    ),
+                            ),
                   ],
                 ),
               ],
@@ -561,49 +378,65 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
     );
   }
 
+  // =============================
+  // BUILD
+  // =============================
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Enrolled Batches',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          widget.goToHomeTab?.call();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          title: const Text(
+            "Enrolled Batches",
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () {
+              widget.goToHomeTab?.call();
+            },
+          ),
+          bottom: TabBar(
+            controller: _tabController,
+            labelColor: Colors.blue,
+            unselectedLabelColor: Colors.grey,
+            tabs: [
+              Tab(text: "All (${allBatches.length})"),
+              Tab(text: "Active (${activeBatches.length})"),
+              Tab(text: "Ended (${endedBatches.length})"),
+            ],
+          ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        bottom: TabBar(
+        body: TabBarView(
           controller: _tabController,
-          labelColor: Colors.blue,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.blue,
-          tabs: [
-            Tab(text: 'All (${allBatches.length})'),
-            Tab(text: 'Active (${activeBatches.length})'),
-            Tab(text: 'Ended (${endedBatches.length})'),
+          children: [
+            RefreshIndicator(
+              onRefresh: fetchEnrolledBatches,
+              child: _buildBatchList(allBatches),
+            ),
+            RefreshIndicator(
+              onRefresh: fetchEnrolledBatches,
+              child: _buildBatchList(activeBatches),
+            ),
+            RefreshIndicator(
+              onRefresh: fetchEnrolledBatches,
+              child: _buildBatchList(endedBatches),
+            ),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          RefreshIndicator(
-            onRefresh: fetchEnrolledBatches,
-            child: _buildBatchList(allBatches),
-          ),
-          RefreshIndicator(
-            onRefresh: fetchEnrolledBatches,
-            child: _buildBatchList(activeBatches),
-          ),
-          RefreshIndicator(
-            onRefresh: fetchEnrolledBatches,
-            child: _buildBatchList(endedBatches),
-          ),
-        ],
       ),
     );
   }

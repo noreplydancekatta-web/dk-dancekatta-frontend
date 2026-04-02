@@ -430,7 +430,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
               // Form Content
               Padding(
-                padding: const EdgeInsets.all(20.0),
+              padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).padding.bottom + 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1016,6 +1016,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
 
                     // ✅ Profile Picture Upload with Camera + Gallery
+                    const SizedBox(height: 16),
                     buildRequiredLabel('Upload Profile Picture'),
                     const SizedBox(height: 8),
                     GestureDetector(

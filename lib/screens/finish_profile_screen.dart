@@ -500,7 +500,7 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fix the errors in the form'),
+          content: Text('Please fill all required fields correctly'),
           backgroundColor: Colors.red,
         ),
       );
@@ -625,17 +625,21 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
 
       if (updatedUser != null) {
         final isComplete = updatedUser.isProfileFullyComplete;
-        Navigator.pop(context, updatedUser);
+
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               isComplete
                   ? 'Profile completed successfully'
-                  : 'Profile updated successfully! Please fill all required fields to complete your profile.',
+                  : 'Profile updated successfully! Please complete remaining fields.',
             ),
             backgroundColor: isComplete ? Colors.green : Colors.blue,
           ),
         );
+
+        // Return updated user to ProfileScreen
+        Navigator.pop(context, updatedUser);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -687,7 +691,12 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
                 _levels.isEmpty)
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(context).padding.bottom + 16,
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(

@@ -16,7 +16,7 @@ import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../screens/login_screen.dart';
-import 'package:flutter/services.dart'; // Added for potential missing imports
+import 'package:flutter/services.dart';
 import '../services/session_manager.dart';
 import '../screens/batch_detail_screen.dart';
 import '../models/batch_model.dart';
@@ -38,10 +38,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Set<String> ratedBatchIds = {};
   bool isLoading = true;
   bool isExpanded = false;
+  bool isUserLoading = true; // ✅ NEW: prevents flicker during initial load
   Map<String, dynamic>? studio;
   Map<String, dynamic>? platformFeeData;
 
-  // Current user data (can be updated from finish profile screen)
   late UserModel currentUser;
 
   @override
@@ -51,7 +51,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _refreshUserData();
     fetchEnrolledBatches();
     fetchPlatformFee();
-    // fetchStudio(batch['studioId']);
   }
 
   Future<void> fetchEnrolledBatches() async {
@@ -123,8 +122,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (updatedUser != null) {
         setState(() {
           currentUser = updatedUser;
+          isUserLoading = false; // ✅ Mark done only after real data arrives
+        });
+      } else {
+        setState(() {
+          isUserLoading = false; // ✅ Still mark done even if fetch failed
         });
       }
+    } else {
+      setState(() {
+        isUserLoading = false;
+      });
     }
   }
 
@@ -134,16 +142,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(builder: (_) => FinishProfileScreen(user: currentUser)),
     );
 
-    // If we get back updated user data, update the current user
     if (result is UserModel) {
       setState(() {
         currentUser = result;
       });
-      // Return updated user to previous screen (HomeScreen)
-      Navigator.pop(context, currentUser);
-      return;
     } else {
-      // Refresh user data after editing
       await _refreshUserData();
     }
   }
@@ -154,16 +157,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(builder: (_) => EditProfileScreen(user: currentUser)),
     );
 
-    // If we get back updated user data, update the current user
     if (result is UserModel) {
       setState(() {
         currentUser = result;
       });
-      // Return updated user to previous screen (HomeScreen)
-      Navigator.pop(context, currentUser);
-      return;
     } else {
-      // Refresh user data after editing
       await _refreshUserData();
     }
   }
@@ -176,7 +174,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
 
-    // Refresh user data after studio registration
     await _refreshUserData();
   }
 
@@ -208,10 +205,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final shouldLogout = await _showLogoutConfirmation(context);
 
       if (shouldLogout) {
-        // ✅ Clear session using SessionManager
         await SessionManager.clearSession();
 
-        // Navigate to login screen and clear navigation stack
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -339,9 +334,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Map<String, dynamic>? studio,
     Map<String, dynamic>? owner,
   ) async {
-    // Fetch owner if not provided
     if (owner == null && studio != null) {
-      owner = await fetchOwner(studio['ownerId']); // your async function
+      owner = await fetchOwner(studio['ownerId']);
     }
 
     final roboto = pw.Font.ttf(
@@ -359,29 +353,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final DateTime fromDate = DateTime.tryParse(txn['fromDate'] ?? '') ?? now;
     final DateTime toDate = DateTime.tryParse(txn['toDate'] ?? '') ?? now;
 
-    // ✅ Use backend values with safe parsing
     final double tutorFee = _parseDouble(txn['fee']);
     final double discountAmount = _parseDouble(txn['discountAmount']);
     print('DEBUG: discountAmount = $discountAmount');
     final double discountedTutorFee = tutorFee - discountAmount;
 
-    // ✅ Use values from backend transaction (already set when txn was created)
     final double platformPercent = _parseDouble(
       platformFeeData?['feePercent'],
       0,
     );
     final double gstPercent = _parseDouble(platformFeeData?['gstPercent'], 0);
 
-    // Calculate platform/convenience fee and GST
     final double platformFee = (discountedTutorFee * platformPercent) / 100;
     final double gstOnPlatformFee = (platformFee * gstPercent) / 100;
 
     final double expectedTotal = tutorFee + platformFee + gstOnPlatformFee;
 
-    // Total fee including platform fee and GST
     final double totalFee = discountedTutorFee + platformFee + gstOnPlatformFee;
 
-    // Amount paid (fallback to totalFee if not provided)
     final double totalAmountPaid = _parseDouble(txn['paymentAmount'], totalFee);
 
     final String? couponCode = txn['couponCode'] as String?;
@@ -403,7 +392,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // 🔹 Header
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -451,10 +439,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         'Invoice Date: ${paymentDate.day}-${paymentDate.month}-${paymentDate.year}',
                         style: pw.TextStyle(fontSize: 10),
                       ),
-                      // pw.Text(
-                      //   'Payment Date: ${paymentDate.day}-${paymentDate.month}-${paymentDate.year}',
-                      //   style: pw.TextStyle(fontSize: 10),
-                      // ),
                       pw.Text(
                         'Customer ID: ${currentUser.id}',
                         style: pw.TextStyle(fontSize: 10),
@@ -501,7 +485,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: pw.TextStyle(fontSize: 10),
                       ),
                       pw.Text(
-                        // 👇 Mobile number added
                         currentUser.mobile ?? 'N/A',
                         style: pw.TextStyle(fontSize: 10),
                       ),
@@ -512,7 +495,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               pw.SizedBox(height: 16),
               pw.Divider(),
 
-              // 🔹 Table Header
               pw.Container(
                 color: PdfColors.grey300,
                 padding: pw.EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -545,7 +527,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                       ),
                     ),
-
                     pw.Expanded(
                       flex: 3,
                       child: pw.Text(
@@ -557,7 +538,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // 🔹 Table Row
               pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(vertical: 8.0),
                 child: pw.Row(
@@ -598,7 +578,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               pw.Divider(),
 
-              // 🔹 Summary
               pw.SizedBox(height: 12),
               pw.Align(
                 alignment: pw.Alignment.centerRight,
@@ -658,16 +637,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           pw.Text('₹${gstOnPlatformFee.toStringAsFixed(2)}'),
                         ],
                       ),
-
-                      // pw.Row(
-                      //   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      //   children: [
-                      //     pw.Text('Total Amount Paid',),
-                      //     pw.Text('₹${totalAmountPaid.toStringAsFixed(2)}',),
-                      //   ],
-                      // ),
                       pw.Divider(),
-
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
@@ -686,7 +656,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              // 🔹 Payment Info
               pw.SizedBox(height: 20),
               pw.Text(
                 'PAYMENTS',
@@ -697,7 +666,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: pw.TextStyle(fontSize: 10),
               ),
 
-              // 🔹 Discount Info
               pw.SizedBox(height: 12),
               pw.Text(
                 'DISCOUNT',
@@ -715,7 +683,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: pw.TextStyle(fontSize: 10),
                 ),
 
-              // 🔹 Notes
               pw.SizedBox(height: 12),
               pw.Text(
                 'NOTES',
@@ -778,7 +745,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Uri.parse('$baseUrl/api/batches'),
               );
 
-              Navigator.pop(context); // close loading dialog
+              Navigator.pop(context);
 
               if (response.statusCode == 200) {
                 final List data = jsonDecode(response.body);
@@ -914,7 +881,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           studioData,
                           null,
                         );
-                        // pass null for owner for now
                       },
                     ),
                   ],
@@ -927,210 +893,259 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // ✅ Extracted studio tile builder — clean and reusable
+  // Widget _buildStudioTile() {
+  //   // Show a slim placeholder while user data is still loading
+  //   if (isUserLoading) {
+  //     return const Padding(
+  //       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  //       child: SizedBox(
+  //         height: 48,
+  //         child: Center(
+  //           child: LinearProgressIndicator(),
+  //         ),
+  //       ),
+  //     );
+  //   }
+
+  //   if (currentUser.isProfessionalChoreographer != true) {
+  //     return const SizedBox.shrink();
+  //   }
+
+  //   final rawStatus = currentUser.studioStatus;
+
+  //   if (rawStatus == null || rawStatus.trim().isEmpty) {
+  //     return _buildListTile(
+  //       "Create Studio Profile",
+  //       Icons.add_business,
+  //       _navigateToStudioRegistration,
+  //     );
+  //   }
+
+  //   final status = rawStatus.trim().toLowerCase();
+
+  //   if (status == 'pending') {
+  //     return _buildStatusContainer(
+  //       title: "Studio Under Review",
+  //       subtitle: "Your studio is under verification",
+  //       icon: Icons.hourglass_top,
+  //       bgColor: Colors.orange,
+  //     );
+  //   }
+
+  //   if (status == 'approved') {
+  //     return _buildStatusContainer(
+  //       title: "Studio Approved",
+  //       subtitle: "Manage your studio on DanceKatta",
+  //       icon: Icons.check_circle,
+  //       bgColor: Colors.green,
+  //     );
+  //   }
+
+  //   if (status == 'disabled') {
+  //     return _buildStatusContainer(
+  //       title: "Studio Disabled",
+  //       subtitle: "Your studio has been disabled",
+  //       icon: Icons.block,
+  //       bgColor: Colors.red,
+  //     );
+  //   }
+
+  // rejected or unknown — show nothing
+  // return const SizedBox.shrink();
+  // }
+  Widget _buildStudioTile() {
+    // Show a placeholder while user data is loading
+    if (isUserLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: SizedBox(
+          height: 48,
+          child: Center(child: LinearProgressIndicator()),
+        ),
+      );
+    }
+
+    // Only professional choreographers can create studios
+    if (!currentUser.isProfessionalChoreographer) {
+      return const SizedBox.shrink();
+    }
+
+    // Only choreographers with >= 1 year experience
+    final double experienceYears =
+        double.tryParse(currentUser.experience ?? "0") ?? 0;
+    if (experienceYears < 1) {
+      return const SizedBox.shrink();
+    }
+
+    final rawStatus = currentUser.studioStatus?.trim().toLowerCase() ?? '';
+
+    // No studio yet → show create button
+    if (rawStatus.isEmpty) {
+      return _buildListTile(
+        "Create Studio Profile",
+        Icons.add_business,
+        _navigateToStudioRegistration,
+      );
+    }
+
+    // Studio exists → show status
+    switch (rawStatus) {
+      case 'pending':
+        return _buildStatusContainer(
+          title: "Studio Under Review",
+          subtitle: "Your studio is under verification",
+          icon: Icons.hourglass_top,
+          bgColor: Colors.orange,
+        );
+      case 'approved':
+        return _buildStatusContainer(
+          title: "Studio Approved",
+          subtitle: "Manage your studio on DanceCount",
+          icon: Icons.check_circle,
+          bgColor: Colors.green,
+        );
+      case 'disabled':
+        return _buildStatusContainer(
+          title: "Studio Disabled",
+          subtitle: "Your studio has been disabled",
+          icon: Icons.block,
+          bgColor: Colors.red,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // ✅ Shared container for all studio status tiles
+  Widget _buildStatusContainer({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required MaterialColor bgColor,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: bgColor.withOpacity(0.3)),
+      ),
+      child: _buildListTile(
+        title,
+        icon,
+        null,
+        subtitle: subtitle,
+        color: bgColor.shade700,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    print("Studio Status from ProfileScreen: ${currentUser.studioStatus}");
-    print("Is Professional: ${currentUser.isProfessionalChoreographer}");
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        title: const Text(
-          "Profile",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshUserData,
-            tooltip: 'Refresh Profile',
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context); // goes back to HomeTab
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[100],
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+          title: const Text(
+            "Profile",
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            CircleAvatar(
-              radius: 55,
-              backgroundColor: Colors.grey[200],
-              backgroundImage: _getProfileImage(currentUser.profilePhoto),
-              child: _getProfileImage(currentUser.profilePhoto) == null
-                  ? const Icon(Icons.person, color: Colors.grey, size: 55)
-                  : null,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refreshUserData,
+              tooltip: 'Refresh Profile',
             ),
-
-            const SizedBox(height: 16),
-            Text(
-              "${currentUser.firstName} ${currentUser.lastName}",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              currentUser.mobile,
-              style: const TextStyle(color: Colors.grey),
-            ),
-            Text(currentUser.email, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 24),
-            _buildSectionTitle("Account"),
-            _buildDropdownTile("Enrolled Batches", buildEnrolledBatches()),
-            const Divider(height: 32),
-
-            // Show different options based on profile completion
-            if (!currentUser.isProfileFullyComplete) ...[
-              _buildListTile(
-                "Finish Your Profile",
-                Icons.person_add,
-                _navigateToFinishProfile,
-              ),
-            ] else ...[
-              _buildListTile(
-                "Edit Personal Profile",
-                Icons.edit,
-                _navigateToEditProfile,
-              ),
-            ],
-
-            // 🟢 FIXED: Studio-related options with comprehensive handling
-            ...(() {
-              // Debug information
-              print("════════════════════════════════════════");
-              print("🔍 STUDIO STATUS DEBUG:");
-              print(
-                "  • Profile Complete: ${currentUser.isProfileFullyComplete}",
-              );
-              print(
-                "  • Is Professional: ${currentUser.isProfessionalChoreographer}",
-              );
-              print("  • Studio Status (raw): '${currentUser.studioStatus}'");
-              print(
-                "  • Studio Status type: ${currentUser.studioStatus.runtimeType}",
-              );
-
-              // Check if professional choreographer
-              if (currentUser.isProfessionalChoreographer != true) {
-                print("  ❌ Not a professional choreographer");
-                print("════════════════════════════════════════");
-                return <Widget>[];
-              }
-
-              // Check if profile is complete
-              if (!currentUser.isProfileFullyComplete) {
-                print("  ❌ Profile not fully complete");
-                print("════════════════════════════════════════");
-                return <Widget>[];
-              }
-
-              // Get and process studio status
-              final rawStatus = currentUser.studioStatus;
-
-              // If studio not created yet
-              if (rawStatus == null || rawStatus.trim().isEmpty) {
-                print("  ✅ No studio found - Showing 'Create Studio Profile'");
-                print("════════════════════════════════════════");
-
-                return [
-                  _buildListTile(
-                    "Create Studio Profile",
-                    Icons.add_business,
-                    _navigateToStudioRegistration,
-                  ),
-                ];
-              }
-
-              // Process status: trim and convert to lowercase
-              final status = rawStatus.trim().toLowerCase();
-              print("  • Processed Status: '$status'");
-
-              // Check for "pending" status (case-insensitive)
-              if (status == 'pending') {
-                print("  ✅ MATCH: Showing 'Studio Under Review'");
-                print("════════════════════════════════════════");
-                return [
-                  Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                    ),
-                    child: _buildListTile(
-                      "Studio Under Review",
-                      Icons.hourglass_top,
-                      null,
-                      subtitle: "Your studio is under verification",
-                      color: Colors.orange.shade700,
-                    ),
-                  ),
-                ];
-              }
-
-              // Check for "approved" status (case-insensitive)
-              if (status == 'approved') {
-                return [
-                  Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.withOpacity(0.3)),
-                    ),
-                    child: _buildListTile(
-                      "Studio Approved",
-                      Icons.check_circle,
-                      null, // ✅ No onTap → Not clickable
-                      subtitle: "Manage your studio on DanceCount",
-                      color: Colors.green.shade700,
-                    ),
-                  ),
-                ];
-              }
-              // Check for "rejected" status
-              if (status == 'rejected') {
-                print("  ⚠️ MATCH: Studio REJECTED - showing nothing");
-                print("════════════════════════════════════════");
-                return <Widget>[];
-              }
-
-              // Unknown status
-              print("  ⚠️ UNKNOWN Status: '$status' - showing nothing");
-              print("════════════════════════════════════════");
-              return <Widget>[];
-            })(),
-
-            const Divider(height: 32),
-            _buildSectionTitle("Support"),
-            _buildListTile(
-              "Contact Us",
-              null,
-              () async {
-                final Uri url = Uri.parse("https://dancekatta.com/contact-us/");
-                try {
-                  await launchUrl(url, mode: LaunchMode.externalApplication);
-                } catch (e) {
-                  print("❌ Could not launch $url: $e");
-                }
-              },
-              customIcon: Image.asset(
-                "assets/icons/contact_us.png",
-                width: 20,
-                height: 20,
-                color: Colors.grey[600],
-              ),
-            ),
-
-            _buildListTile("Log Out", Icons.logout, _logout),
-
-            const SizedBox(height: 32),
           ],
+        ),
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              CircleAvatar(
+                radius: 55,
+                backgroundColor: Colors.grey[200],
+                backgroundImage: _getProfileImage(currentUser.profilePhoto),
+                child: _getProfileImage(currentUser.profilePhoto) == null
+                    ? const Icon(Icons.person, color: Colors.grey, size: 55)
+                    : null,
+              ),
+
+              const SizedBox(height: 16),
+              Text(
+                "${currentUser.firstName} ${currentUser.lastName}",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                currentUser.mobile,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              Text(
+                currentUser.email,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+
+              _buildSectionTitle("Account"),
+              _buildDropdownTile("Enrolled Batches", buildEnrolledBatches()),
+              const Divider(height: 32),
+
+              if (!currentUser.isProfileFullyComplete)
+                _buildListTile(
+                  "Finish Your Profile",
+                  Icons.person_add,
+                  _navigateToFinishProfile,
+                )
+              else
+                _buildListTile(
+                  "Edit Personal Profile",
+                  Icons.edit,
+                  _navigateToEditProfile,
+                ),
+
+              // ✅ Single clean call — no flicker, no inline IIFE
+              _buildStudioTile(),
+
+              const Divider(height: 32),
+              _buildSectionTitle("Support"),
+              _buildListTile(
+                "Contact Us",
+                null,
+                () async {
+                  final Uri url = Uri.parse(
+                    "https://dancekatta.com/contact-us/",
+                  );
+                  try {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    print("❌ Could not launch $url: $e");
+                  }
+                },
+                customIcon: Image.asset(
+                  "assets/icons/contact_us.png",
+                  width: 20,
+                  height: 20,
+                  color: Colors.grey[600],
+                ),
+              ),
+
+              _buildListTile("Log Out", Icons.logout, _logout),
+
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );
@@ -1163,13 +1178,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildListTile(
     String title,
     IconData? icon,
-    VoidCallback? onTap, { // make onTap nullable to allow disabling
+    VoidCallback? onTap, {
     Widget? customIcon,
     Color? color,
-    String? subtitle, // new parameter
+    String? subtitle,
   }) {
     return InkWell(
-      onTap: onTap, // if null, tile is disabled
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
         child: Column(
@@ -1218,25 +1233,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Helper to build full URL for uploaded images
   String getFullImageUrl(String? relativePath) {
     if (relativePath == null || relativePath.isEmpty) return "";
     if (relativePath.startsWith("http")) return relativePath;
-    return "http://147.93.19.17:5002$relativePath"; // ✅ keep same as edit_profile
+    return "http://147.93.19.17:5002$relativePath";
   }
 
-  /// Returns an ImageProvider for the profile image
   ImageProvider? _getProfileImage(String? relativePath) {
     if (relativePath == null || relativePath.isEmpty) {
-      return null; // no image, CircleAvatar will show the child
+      return null;
     }
-
-    // If already a full URL (e.g., from social login or testing)
     if (relativePath.startsWith('http')) {
       return NetworkImage(relativePath);
     }
-
-    // Otherwise, treat as relative path from backend
     return NetworkImage("http://147.93.19.17:5002$relativePath");
   }
 }

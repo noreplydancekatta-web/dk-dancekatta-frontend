@@ -94,12 +94,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         "api/users/profile-image",
       );
       setState(() => _profilePhoto = relativePath);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile image uploaded successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   const SnackBar(
+      //     content: Text('Profile image uploaded successfully!'),
+      //     backgroundColor: Colors.green,
+      //   ),
+      // );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -545,7 +546,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fix the errors in the form'),
+          content: Text('Please fill all required fields correctly'),
           backgroundColor: Colors.red,
         ),
       );
@@ -651,10 +652,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (updatedUser != null) {
-        Navigator.pop(context, updatedUser);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully')),
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
+
+        // Navigate back to previous screen with updated user
+        Navigator.pop(context, updatedUser);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -685,234 +691,140 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 _danceStyles.isEmpty ||
                 _levels.isEmpty)
             ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      // ─────────────────────────────────────────
-                      // 📷 Profile Photo (Camera + Gallery)
-                      // ─────────────────────────────────────────
-                      GestureDetector(
-                        onTap: _pickProfileImage,
-                        child: Column(
-                          children: [
-                            Stack(
-                              alignment: Alignment.bottomRight,
-                              children: [
-                                CircleAvatar(
-                                  radius: 55,
-                                  backgroundColor: Colors.grey[200],
-                                  backgroundImage:
-                                      (_profilePhoto != null &&
-                                          _profilePhoto!.isNotEmpty &&
-                                          !_isSubmitting)
-                                      ? NetworkImage(
-                                          getFullImageUrl(_profilePhoto),
-                                        )
-                                      : null,
-                                  child: _isSubmitting
-                                      ? const CircularProgressIndicator(
-                                          color: Colors.blue,
-                                        )
-                                      : (_profilePhoto == null ||
-                                                _profilePhoto!.isEmpty
-                                            ? const Icon(
-                                                Icons.person,
-                                                size: 55,
-                                                color: Colors.grey,
-                                              )
-                                            : null),
-                                ),
-                                // Camera badge
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF3A5ED4),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.camera_alt,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            RichText(
-                              text: const TextSpan(
-                                text: 'Profile Photo',
-                                style: TextStyle(
-                                  color: Colors.black54,
-                                  fontSize: 13,
-                                ),
+            : SafeArea(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 16,
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        // ─────────────────────────────────────────
+                        // 📷 Profile Photo (Camera + Gallery)
+                        // ─────────────────────────────────────────
+                        GestureDetector(
+                          onTap: _pickProfileImage,
+                          child: Column(
+                            children: [
+                              Stack(
+                                alignment: Alignment.bottomRight,
                                 children: [
-                                  TextSpan(
-                                    text: ' *',
-                                    style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold,
+                                  CircleAvatar(
+                                    radius: 55,
+                                    backgroundColor: Colors.grey[200],
+                                    backgroundImage:
+                                        (_profilePhoto != null &&
+                                            _profilePhoto!.isNotEmpty &&
+                                            !_isSubmitting)
+                                        ? NetworkImage(
+                                            getFullImageUrl(_profilePhoto),
+                                          )
+                                        : null,
+                                    child: _isSubmitting
+                                        ? const CircularProgressIndicator(
+                                            color: Colors.blue,
+                                          )
+                                        : (_profilePhoto == null ||
+                                                  _profilePhoto!.isEmpty
+                                              ? const Icon(
+                                                  Icons.person,
+                                                  size: 55,
+                                                  color: Colors.grey,
+                                                )
+                                              : null),
+                                  ),
+                                  // Camera badge
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF3A5ED4),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.camera_alt,
+                                      size: 16,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Tap to change (Camera or Gallery)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.black38,
+                              const SizedBox(height: 6),
+                              RichText(
+                                text: const TextSpan(
+                                  text: 'Profile Photo',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: ' *',
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // ✅ First Name *
-                      _spacedField(
-                        TextFormField(
-                          controller: _firstNameController,
-                          textCapitalization: TextCapitalization.words,
-                          inputFormatters: [CapitalizeWordsFormatter()],
-                          decoration: InputDecoration(
-                            label: _requiredLabel('First Name'),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Tap to change (Camera or Gallery)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.black38,
+                                ),
+                              ),
+                            ],
                           ),
-                          validator: (value) => value?.isEmpty == true
-                              ? 'First name is required'
-                              : null,
                         ),
-                      ),
 
-                      // ✅ Last Name *
-                      _spacedField(
-                        TextFormField(
-                          controller: _lastNameController,
-                          textCapitalization: TextCapitalization.words,
-                          inputFormatters: [CapitalizeWordsFormatter()],
-                          decoration: InputDecoration(
-                            label: _requiredLabel('Last Name'),
-                          ),
-                          validator: (value) => value?.isEmpty == true
-                              ? 'Last name is required'
-                              : null,
-                        ),
-                      ),
+                        const SizedBox(height: 20),
 
-                      // ✅ Email *
-                      _spacedField(
-                        TextFormField(
-                          controller: _emailController,
-                          decoration: InputDecoration(
-                            label: _requiredLabel('Email'),
-                          ),
-                          validator: (value) {
-                            if (value?.isEmpty == true)
-                              return 'Email is required';
-                            if (!RegExp(
-                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                            ).hasMatch(value!)) {
-                              return 'Please enter a valid email';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-
-                      // ✅ Mobile *
-                      _spacedField(
-                        TextFormField(
-                          controller: _mobileController,
-                          decoration: InputDecoration(
-                            label: _requiredLabel('Mobile'),
-                          ),
-                          keyboardType: TextInputType.phone,
-                          validator: _validatePhoneNumber,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          maxLength: 10,
-                        ),
-                      ),
-
-                      // Alt Mobile (optional)
-                      _spacedField(
-                        TextFormField(
-                          controller: _altMobileController,
-                          decoration: const InputDecoration(
-                            labelText: 'Alt Mobile (Optional)',
-                          ),
-                          keyboardType: TextInputType.phone,
-                          validator: (value) {
-                            if (value?.isNotEmpty == true) {
-                              return _validatePhoneNumber(value);
-                            }
-                            return null;
-                          },
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          maxLength: 10,
-                        ),
-                      ),
-
-                      // ✅ Date of Birth *
-                      _spacedField(
-                        TextFormField(
-                          controller: _dobController,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            label: _requiredLabel('Date of Birth'),
-                          ),
-                          onTap: _pickDate,
-                          validator: (value) => value?.isEmpty == true
-                              ? 'Date of birth is required'
-                              : null,
-                        ),
-                      ),
-
-                      // Guardian fields (only for under 18)
-                      if (!_isUserAdult) ...[
+                        // ✅ First Name *
                         _spacedField(
                           TextFormField(
-                            controller: _guardianNameController,
+                            controller: _firstNameController,
                             textCapitalization: TextCapitalization.words,
                             inputFormatters: [CapitalizeWordsFormatter()],
                             decoration: InputDecoration(
-                              label: _requiredLabel('Guardian Name'),
+                              label: _requiredLabel('First Name'),
                             ),
                             validator: (value) => value?.isEmpty == true
-                                ? 'Guardian name is required'
+                                ? 'First name is required'
                                 : null,
                           ),
                         ),
+
+                        // ✅ Last Name *
                         _spacedField(
                           TextFormField(
-                            controller: _guardianMobileController,
-                            decoration: const InputDecoration(
-                              labelText: 'Guardian Mobile',
+                            controller: _lastNameController,
+                            textCapitalization: TextCapitalization.words,
+                            inputFormatters: [CapitalizeWordsFormatter()],
+                            decoration: InputDecoration(
+                              label: _requiredLabel('Last Name'),
                             ),
-                            keyboardType: TextInputType.phone,
-                            validator: _validatePhoneNumber,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            maxLength: 10,
+                            validator: (value) => value?.isEmpty == true
+                                ? 'Last name is required'
+                                : null,
                           ),
                         ),
+
+                        // ✅ Email *
                         _spacedField(
                           TextFormField(
-                            controller: _guardianEmailController,
-                            decoration: const InputDecoration(
-                              labelText: 'Guardian Email',
+                            controller: _emailController,
+                            decoration: InputDecoration(
+                              label: _requiredLabel('Email'),
                             ),
                             validator: (value) {
                               if (value?.isEmpty == true)
-                                return 'Guardian email is required';
+                                return 'Email is required';
                               if (!RegExp(
                                 r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
                               ).hasMatch(value!)) {
@@ -922,321 +834,426 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             },
                           ),
                         ),
-                      ],
 
-                      // ✅ Address *
-                      _spacedField(
-                        TextFormField(
-                          controller: _addressController,
-                          textCapitalization: TextCapitalization.words,
-                          inputFormatters: [CapitalizeWordsFormatter()],
-                          decoration: InputDecoration(
-                            label: _requiredLabel('Flat No / Address'),
-                          ),
-                          validator: (value) => value?.isEmpty == true
-                              ? 'Address is required'
-                              : null,
-                        ),
-                      ),
-
-                      // ✅ Pincode *
-                      _spacedField(
-                        TextFormField(
-                          controller: _pincodeController,
-                          decoration: InputDecoration(
-                            label: _requiredLabel('Pincode'),
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: _validatePincode,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          maxLength: 6,
-                          onChanged: (value) {
-                            if (value.length == 6) {
-                              _hasUserChangedPincode = true;
-                              _fetchAddressFromPincode(value);
-                            }
-                          },
-                        ),
-                      ),
-
-                      // ✅ City *
-                      if (_cities.isNotEmpty)
-                        _spacedField(
-                          DropdownMenu<String>(
-                            initialSelection:
-                                (_cityController.text.isNotEmpty &&
-                                    _cities.contains(_cityController.text))
-                                ? _cityController.text
-                                : null,
-                            expandedInsets: EdgeInsets.zero,
-                            inputDecorationTheme: InputDecorationTheme(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                            ),
-                            label: _requiredLabel('City'),
-                            hintText: 'Select City',
-                            dropdownMenuEntries: _cities
-                                .map(
-                                  (city) => DropdownMenuEntry<String>(
-                                    value: city,
-                                    label: city,
-                                  ),
-                                )
-                                .toList(),
-                            onSelected: (val) => setState(
-                              () => _cityController.text = val ?? '',
-                            ),
-                            menuStyle: MenuStyle(
-                              alignment: AlignmentDirectional.bottomStart,
-                              maximumSize: MaterialStateProperty.all<Size>(
-                                const Size.fromHeight(200),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                      // ✅ State *
-                      if (_states.isNotEmpty)
-                        _spacedField(
-                          DropdownMenu<String>(
-                            initialSelection:
-                                (_stateController.text.isNotEmpty &&
-                                    _states.contains(_stateController.text))
-                                ? _stateController.text
-                                : null,
-                            expandedInsets: EdgeInsets.zero,
-                            inputDecorationTheme: InputDecorationTheme(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                            ),
-                            label: _requiredLabel('State'),
-                            hintText: 'Select State',
-                            dropdownMenuEntries: _states
-                                .map(
-                                  (state) => DropdownMenuEntry<String>(
-                                    value: state,
-                                    label: state,
-                                  ),
-                                )
-                                .toList(),
-                            onSelected: (val) => setState(
-                              () => _stateController.text = val ?? '',
-                            ),
-                            menuStyle: MenuStyle(
-                              alignment: AlignmentDirectional.bottomStart,
-                              maximumSize: MaterialStateProperty.all<Size>(
-                                const Size.fromHeight(200),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                      // ✅ Country *
-                      if (_countries.isNotEmpty)
-                        _spacedField(
-                          DropdownMenu<String>(
-                            initialSelection:
-                                (_countryController.text.isNotEmpty &&
-                                    _countries.contains(
-                                      _countryController.text,
-                                    ))
-                                ? _countryController.text
-                                : null,
-                            expandedInsets: EdgeInsets.zero,
-                            inputDecorationTheme: InputDecorationTheme(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                            ),
-                            label: _requiredLabel('Country'),
-                            hintText: 'Select Country',
-                            dropdownMenuEntries: _countries
-                                .map(
-                                  (country) => DropdownMenuEntry<String>(
-                                    value: country,
-                                    label: country,
-                                  ),
-                                )
-                                .toList(),
-                            onSelected: (val) => setState(
-                              () => _countryController.text = val ?? '',
-                            ),
-                            menuStyle: MenuStyle(
-                              alignment: AlignmentDirectional.bottomStart,
-                              maximumSize: MaterialStateProperty.all<Size>(
-                                const Size.fromHeight(200),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                      // Social links (optional)
-                      _spacedField(
-                        TextFormField(
-                          controller: _youtubeController,
-                          decoration: const InputDecoration(
-                            labelText: 'YouTube',
-                          ),
-                        ),
-                      ),
-                      _spacedField(
-                        TextFormField(
-                          controller: _facebookController,
-                          decoration: const InputDecoration(
-                            labelText: 'Facebook',
-                          ),
-                        ),
-                      ),
-                      _spacedField(
-                        TextFormField(
-                          controller: _instagramController,
-                          decoration: const InputDecoration(
-                            labelText: 'Instagram',
-                          ),
-                        ),
-                      ),
-
-                      // ✅ Professional Choreographer *
-                      _spacedField(
-                        DropdownButtonFormField<String>(
-                          value:
-                              (_isProfessional == 'Yes' ||
-                                  _isProfessional == 'No')
-                              ? _isProfessional
-                              : null,
-                          items: const [
-                            DropdownMenuItem(value: 'Yes', child: Text('Yes')),
-                            DropdownMenuItem(value: 'No', child: Text('No')),
-                          ],
-                          onChanged: (val) =>
-                              setState(() => _isProfessional = val),
-                          decoration: InputDecoration(
-                            label: _requiredLabel(
-                              'Are you a professional choreographer?',
-                            ),
-                          ),
-                          validator: (value) => (value == null || value.isEmpty)
-                              ? 'Please select an option'
-                              : null,
-                        ),
-                      ),
-
-                      // ✅ Experience * (only when Professional = Yes)
-                      if (_isProfessional == 'Yes')
+                        // ✅ Mobile *
                         _spacedField(
                           TextFormField(
-                            controller: _experienceController,
+                            controller: _mobileController,
                             decoration: InputDecoration(
-                              label: _requiredLabel(
-                                'Teaching Experience (in years)',
-                              ),
+                              label: _requiredLabel('Mobile'),
                             ),
-                            keyboardType: TextInputType.number,
+                            keyboardType: TextInputType.phone,
+                            validator: _validatePhoneNumber,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],
-                            validator: (value) =>
-                                (value == null || value.isEmpty)
-                                ? 'Experience is required'
+                            maxLength: 10,
+                          ),
+                        ),
+
+                        // Alt Mobile (optional)
+                        _spacedField(
+                          TextFormField(
+                            controller: _altMobileController,
+                            decoration: const InputDecoration(
+                              labelText: 'Alt Mobile (Optional)',
+                            ),
+                            keyboardType: TextInputType.phone,
+                            validator: (value) {
+                              if (value?.isNotEmpty == true) {
+                                return _validatePhoneNumber(value);
+                              }
+                              return null;
+                            },
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            maxLength: 10,
+                          ),
+                        ),
+
+                        // ✅ Date of Birth *
+                        _spacedField(
+                          TextFormField(
+                            controller: _dobController,
+                            readOnly: true,
+                            decoration: InputDecoration(
+                              label: _requiredLabel('Date of Birth'),
+                            ),
+                            onTap: _pickDate,
+                            validator: (value) => value?.isEmpty == true
+                                ? 'Date of birth is required'
                                 : null,
                           ),
                         ),
 
-                      // Dance Skills
-                      if (!_loadingDropdowns) ...[
-                        const SizedBox(height: 16),
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Dance Skills',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                        // Guardian fields (only for under 18)
+                        if (!_isUserAdult) ...[
+                          _spacedField(
+                            TextFormField(
+                              controller: _guardianNameController,
+                              textCapitalization: TextCapitalization.words,
+                              inputFormatters: [CapitalizeWordsFormatter()],
+                              decoration: InputDecoration(
+                                label: _requiredLabel('Guardian Name'),
+                              ),
+                              validator: (value) => value?.isEmpty == true
+                                  ? 'Guardian name is required'
+                                  : null,
+                            ),
+                          ),
+                          _spacedField(
+                            TextFormField(
+                              controller: _guardianMobileController,
+                              decoration: const InputDecoration(
+                                labelText: 'Guardian Mobile',
+                              ),
+                              keyboardType: TextInputType.phone,
+                              validator: _validatePhoneNumber,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              maxLength: 10,
+                            ),
+                          ),
+                          _spacedField(
+                            TextFormField(
+                              controller: _guardianEmailController,
+                              decoration: const InputDecoration(
+                                labelText: 'Guardian Email',
+                              ),
+                              validator: (value) {
+                                if (value?.isEmpty == true)
+                                  return 'Guardian email is required';
+                                if (!RegExp(
+                                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                ).hasMatch(value!)) {
+                                  return 'Please enter a valid email';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+
+                        // ✅ Address *
+                        _spacedField(
+                          TextFormField(
+                            controller: _addressController,
+                            textCapitalization: TextCapitalization.words,
+                            inputFormatters: [CapitalizeWordsFormatter()],
+                            decoration: InputDecoration(
+                              label: _requiredLabel('Flat No / Address'),
+                            ),
+                            validator: (value) => value?.isEmpty == true
+                                ? 'Address is required'
+                                : null,
+                          ),
+                        ),
+
+                        // ✅ Pincode *
+                        _spacedField(
+                          TextFormField(
+                            controller: _pincodeController,
+                            decoration: InputDecoration(
+                              label: _requiredLabel('Pincode'),
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: _validatePincode,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            maxLength: 6,
+                            onChanged: (value) {
+                              if (value.length == 6) {
+                                _hasUserChangedPincode = true;
+                                _fetchAddressFromPincode(value);
+                              }
+                            },
+                          ),
+                        ),
+
+                        // ✅ City *
+                        if (_cities.isNotEmpty)
+                          _spacedField(
+                            DropdownMenu<String>(
+                              initialSelection:
+                                  (_cityController.text.isNotEmpty &&
+                                      _cities.contains(_cityController.text))
+                                  ? _cityController.text
+                                  : null,
+                              expandedInsets: EdgeInsets.zero,
+                              inputDecorationTheme: InputDecorationTheme(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 4,
+                                ),
+                              ),
+                              label: _requiredLabel('City'),
+                              hintText: 'Select City',
+                              dropdownMenuEntries: _cities
+                                  .map(
+                                    (city) => DropdownMenuEntry<String>(
+                                      value: city,
+                                      label: city,
+                                    ),
+                                  )
+                                  .toList(),
+                              onSelected: (val) => setState(
+                                () => _cityController.text = val ?? '',
+                              ),
+                              menuStyle: MenuStyle(
+                                alignment: AlignmentDirectional.bottomStart,
+                                maximumSize: MaterialStateProperty.all<Size>(
+                                  const Size.fromHeight(200),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        // ✅ State *
+                        if (_states.isNotEmpty)
+                          _spacedField(
+                            DropdownMenu<String>(
+                              initialSelection:
+                                  (_stateController.text.isNotEmpty &&
+                                      _states.contains(_stateController.text))
+                                  ? _stateController.text
+                                  : null,
+                              expandedInsets: EdgeInsets.zero,
+                              inputDecorationTheme: InputDecorationTheme(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 4,
+                                ),
+                              ),
+                              label: _requiredLabel('State'),
+                              hintText: 'Select State',
+                              dropdownMenuEntries: _states
+                                  .map(
+                                    (state) => DropdownMenuEntry<String>(
+                                      value: state,
+                                      label: state,
+                                    ),
+                                  )
+                                  .toList(),
+                              onSelected: (val) => setState(
+                                () => _stateController.text = val ?? '',
+                              ),
+                              menuStyle: MenuStyle(
+                                alignment: AlignmentDirectional.bottomStart,
+                                maximumSize: MaterialStateProperty.all<Size>(
+                                  const Size.fromHeight(200),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        // ✅ Country *
+                        if (_countries.isNotEmpty)
+                          _spacedField(
+                            DropdownMenu<String>(
+                              initialSelection:
+                                  (_countryController.text.isNotEmpty &&
+                                      _countries.contains(
+                                        _countryController.text,
+                                      ))
+                                  ? _countryController.text
+                                  : null,
+                              expandedInsets: EdgeInsets.zero,
+                              inputDecorationTheme: InputDecorationTheme(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 4,
+                                ),
+                              ),
+                              label: _requiredLabel('Country'),
+                              hintText: 'Select Country',
+                              dropdownMenuEntries: _countries
+                                  .map(
+                                    (country) => DropdownMenuEntry<String>(
+                                      value: country,
+                                      label: country,
+                                    ),
+                                  )
+                                  .toList(),
+                              onSelected: (val) => setState(
+                                () => _countryController.text = val ?? '',
+                              ),
+                              menuStyle: MenuStyle(
+                                alignment: AlignmentDirectional.bottomStart,
+                                maximumSize: MaterialStateProperty.all<Size>(
+                                  const Size.fromHeight(200),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        // Social links (optional)
+                        _spacedField(
+                          TextFormField(
+                            controller: _youtubeController,
+                            decoration: const InputDecoration(
+                              labelText: 'YouTube',
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        ..._skills.asMap().entries.map(
-                          (e) => _buildSkillField(e.key),
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _skills.add({'style': null, 'level': null});
-                              });
-                            },
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Text(
-                                  'Add Skill',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                SizedBox(width: 6),
-                                Icon(
-                                  Icons.add_circle,
-                                  color: Color(0xFF3A5ED4),
-                                  size: 26,
-                                ),
-                              ],
+                        _spacedField(
+                          TextFormField(
+                            controller: _facebookController,
+                            decoration: const InputDecoration(
+                              labelText: 'Facebook',
                             ),
+                          ),
+                        ),
+                        _spacedField(
+                          TextFormField(
+                            controller: _instagramController,
+                            decoration: const InputDecoration(
+                              labelText: 'Instagram',
+                            ),
+                          ),
+                        ),
+
+                        // ✅ Professional Choreographer *
+                        _spacedField(
+                          DropdownButtonFormField<String>(
+                            value:
+                                (_isProfessional == 'Yes' ||
+                                    _isProfessional == 'No')
+                                ? _isProfessional
+                                : null,
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'Yes',
+                                child: Text('Yes'),
+                              ),
+                              DropdownMenuItem(value: 'No', child: Text('No')),
+                            ],
+                            onChanged: (val) =>
+                                setState(() => _isProfessional = val),
+                            decoration: InputDecoration(
+                              label: _requiredLabel(
+                                'Are you a professional choreographer?',
+                              ),
+                            ),
+                            validator: (value) =>
+                                (value == null || value.isEmpty)
+                                ? 'Please select an option'
+                                : null,
+                          ),
+                        ),
+
+                        // ✅ Experience * (only when Professional = Yes)
+                        if (_isProfessional == 'Yes')
+                          _spacedField(
+                            TextFormField(
+                              controller: _experienceController,
+                              decoration: InputDecoration(
+                                label: _requiredLabel(
+                                  'Teaching Experience (in years)',
+                                ),
+                              ),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              validator: (value) =>
+                                  (value == null || value.isEmpty)
+                                  ? 'Experience is required'
+                                  : null,
+                            ),
+                          ),
+
+                        // Dance Skills
+                        if (!_loadingDropdowns) ...[
+                          const SizedBox(height: 16),
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Dance Skills',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ..._skills.asMap().entries.map(
+                            (e) => _buildSkillField(e.key),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _skills.add({'style': null, 'level': null});
+                                });
+                              },
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Text(
+                                    'Add Skill',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Icon(
+                                    Icons.add_circle,
+                                    color: Color(0xFF3A5ED4),
+                                    size: 26,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : _showUpdateConfirmation,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              backgroundColor: const Color(0xFF3A5ED4),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: _isSubmitting
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    "Update Profile",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                           ),
                         ),
                       ],
-
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isSubmitting
-                              ? null
-                              : _showUpdateConfirmation,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: const Color(0xFF3A5ED4),
-                            foregroundColor: Colors.white,
-                          ),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  "Update Profile",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
