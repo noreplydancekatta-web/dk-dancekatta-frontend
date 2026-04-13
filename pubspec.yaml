@@ -2,7 +2,7 @@ name: dancekatta
 description: "DanceKatta app"
 publish_to: 'none'
 
-version: 1.0.3
+version: 1.0.5
 
 environment:
   sdk: ">=3.8.1 <4.0.0"

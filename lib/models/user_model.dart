@@ -41,6 +41,9 @@ class UserModel {
   final String? status; // "Active" or "Disabled"
   final bool isProfileFullyComplete;
 
+  // ✅ GETTER — bridges the name used in login_screen.dart
+  bool get isProfileComplete => isProfileFullyComplete;
+
   UserModel({
     this.id,
     required this.firstName,
@@ -199,7 +202,7 @@ class UserModel {
       isStudioOwner: json['isStudioOwner'],
       studioCreated: json['studioCreated'],
       status: json['status'],
-      isProfileFullyComplete: isProfileFullyComplete, // ✅ computed locally
+      isProfileFullyComplete: isProfileFullyComplete,
     );
   }
 

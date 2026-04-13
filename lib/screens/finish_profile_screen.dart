@@ -590,11 +590,7 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
       };
 
       if (_profilePhoto != null && _profilePhoto!.isNotEmpty) {
-        if (_profilePhoto!.startsWith('/uploads/')) {
-          updatedData["profilePhoto"] = _profilePhoto;
-        } else if (_profilePhoto!.startsWith('http')) {
-          updatedData["profilePhoto"] = Uri.parse(_profilePhoto!).path;
-        }
+        updatedData["profilePhoto"] = _profilePhoto; // ✅ KEEP FULL URL
       }
 
       if (widget.user.id == null || widget.user.id!.isEmpty) {
@@ -717,7 +713,11 @@ class _FinishProfileScreenState extends State<FinishProfileScreen> {
                                           _profilePhoto!.isNotEmpty &&
                                           !_isSubmitting)
                                       ? NetworkImage(
-                                          getFullImageUrl(_profilePhoto),
+                                          _profilePhoto!.startsWith('http')
+                                              ? _profilePhoto! // ✅ Google image
+                                              : getFullImageUrl(
+                                                  _profilePhoto,
+                                                ), // ✅ server image
                                         )
                                       : null,
                                   child: _isSubmitting

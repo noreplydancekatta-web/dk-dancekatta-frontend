@@ -38,13 +38,15 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
   // Add a variable to hold the latest studio data
   late StudioModel currentStudio;
 
-  void _openPhotoViewer(BuildContext context, List<String> photos, int initialIndex) {
+  void _openPhotoViewer(
+    BuildContext context,
+    List<String> photos,
+    int initialIndex,
+  ) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => _PhotoViewerScreen(
-          photos: photos,
-          initialIndex: initialIndex,
-        ),
+        builder: (_) =>
+            _PhotoViewerScreen(photos: photos, initialIndex: initialIndex),
       ),
     );
   }
@@ -475,7 +477,11 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                   ? Container(
                       height: 250,
                       color: Colors.grey[300],
-                      child: const Icon(Icons.store, size: 60, color: Colors.grey),
+                      child: const Icon(
+                        Icons.store,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
                     )
                   : SizedBox(
                       height: 250,
@@ -488,21 +494,29 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                             },
                             itemCount: studio.studioPhotos.length,
                             itemBuilder: (context, index) {
-                              final photoUrl = getFullImageUrl(studio.studioPhotos[index]);
+                              final photoUrl = getFullImageUrl(
+                                studio.studioPhotos[index],
+                              );
                               return GestureDetector(
                                 onTap: () => _openPhotoViewer(
                                   context,
-                                  studio.studioPhotos.map((p) => getFullImageUrl(p)).toList(),
+                                  studio.studioPhotos
+                                      .map((p) => getFullImageUrl(p))
+                                      .toList(),
                                   index,
                                 ),
                                 child: Image.network(
                                   photoUrl,
                                   fit: BoxFit.cover,
                                   width: double.infinity,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    color: Colors.grey[300],
-                                    child: const Icon(Icons.broken_image, size: 40),
-                                  ),
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                        color: Colors.grey[300],
+                                        child: const Icon(
+                                          Icons.broken_image,
+                                          size: 40,
+                                        ),
+                                      ),
                                 ),
                               );
                             },
@@ -519,7 +533,9 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                                   studio.studioPhotos.length,
                                   (index) => AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
-                                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 3,
+                                    ),
                                     width: _currentPage == index ? 20 : 8,
                                     height: 8,
                                     decoration: BoxDecoration(
@@ -543,7 +559,9 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                                   onTap: () {
                                     if (_currentPage > 0) {
                                       _pageController.previousPage(
-                                        duration: const Duration(milliseconds: 300),
+                                        duration: const Duration(
+                                          milliseconds: 300,
+                                        ),
                                         curve: Curves.easeInOut,
                                       );
                                     }
@@ -573,9 +591,12 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                               child: Center(
                                 child: GestureDetector(
                                   onTap: () {
-                                    if (_currentPage < studio.studioPhotos.length - 1) {
+                                    if (_currentPage <
+                                        studio.studioPhotos.length - 1) {
                                       _pageController.nextPage(
-                                        duration: const Duration(milliseconds: 300),
+                                        duration: const Duration(
+                                          milliseconds: 300,
+                                        ),
                                         curve: Curves.easeInOut,
                                       );
                                     }
@@ -608,15 +629,36 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                   children: [
                     // Studio Name + Rating
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          studio.studioName,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Studio Name"),
+                                  content: Text(studio.studioName),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text("Close"),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: Text(
+                              studio.studioName,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -756,13 +798,16 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                       const SizedBox(height: 10),
                       _branchInfoRow(
                         icon: Icons.phone_outlined,
-                        text: branches[selectedBranchIndex].contactNo ?? 'Not available',
+                        text:
+                            branches[selectedBranchIndex].contactNo ??
+                            'Not available',
                       ),
                       const SizedBox(height: 10),
                       branches[selectedBranchIndex].mapLink.isNotEmpty
                           ? GestureDetector(
                               onTap: () async {
-                                final url = branches[selectedBranchIndex].mapLink;
+                                final url =
+                                    branches[selectedBranchIndex].mapLink;
                                 final uri = Uri.parse(url);
                                 if (await launcher.canLaunchUrl(uri)) {
                                   await launcher.launchUrl(uri);
@@ -895,7 +940,7 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                           final bgColor =
                               _initialColors[index % _initialColors.length];
                           return GestureDetector(
-                            onTap: () {
+                            onTap: () async {
                               try {
                                 print(
                                   '🎯 Navigating to batch detail from studio screen...',
@@ -905,15 +950,24 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
                                   '🏢 Branch: ${branches[selectedBranchIndex].name}',
                                 );
 
-                                Navigator.push(
+                                final batchModel = batch;
+
+                                final branchModel =
+                                    branches[selectedBranchIndex];
+
+                                final result = await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => BatchDetailScreen(
-                                      batch: batch,
-                                      branch: branches[selectedBranchIndex],
+                                    builder: (_) => BatchDetailScreen(
+                                      batch: batchModel,
+                                      branch: branchModel,
                                     ),
                                   ),
                                 );
+
+                                if (result == true) {
+                                  setState(() {}); // 🔥 refresh UI
+                                }
                               } catch (e) {
                                 print('❌ Error navigating to batch detail: $e');
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1284,7 +1338,9 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
             style: TextStyle(
               fontSize: 15,
               color: isLink ? const Color(0xFF3A5ED4) : Colors.black87,
-              decoration: isLink ? TextDecoration.underline : TextDecoration.none,
+              decoration: isLink
+                  ? TextDecoration.underline
+                  : TextDecoration.none,
               fontWeight: isLink ? FontWeight.w500 : FontWeight.normal,
             ),
           ),
@@ -1371,7 +1427,10 @@ class _PhotoViewerScreenState extends State<_PhotoViewerScreen> {
               top: MediaQuery.of(context).padding.top + 14,
               left: 16,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(12),

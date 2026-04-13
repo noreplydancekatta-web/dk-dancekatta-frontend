@@ -6,12 +6,9 @@ import 'dart:convert';
 import 'login_with_otp_screen.dart';
 import 'signup_screen.dart';
 
-// New imports for Google Sign-In and Firebase Auth
-// import 'package:google_sign_in/google_sign_in.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-// Assuming you have a dummy screen for finishing the profile
-// You will need to create this file
 import 'finish_profile_screen.dart';
 import '/models/user_model.dart';
 import '/screens/home_screen.dart';
@@ -29,12 +26,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   bool isLoading = false;
 
-  // // Initialize Firebase and Google Sign-In instances
-  // final FirebaseAuth _auth = FirebaseAuth.instance;
-  // final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
   final AuthService _authService = AuthService();
 
-  /// Handles the traditional OTP login process
   Future<void> sendOTPAndNavigate() async {
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
@@ -54,16 +49,13 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.statusCode == 200) {
-        // ✅ Check if email already exists in DB
         final isRegistered = await _authService.isEmailRegistered(email);
 
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => LoginWithOTPScreen(
-              email: email,
-              isNewUser: !isRegistered, // pass flag
-            ),
+            builder: (context) =>
+                LoginWithOTPScreen(email: email, isNewUser: !isRegistered),
           ),
         );
       } else {
@@ -81,123 +73,88 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Future<void> _handleGoogleSignIn() async {
-  //   setState(() => isLoading = true);
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => isLoading = true);
 
-  //   try {
-  //     // // 🔹 Reset GoogleSignIn and FirebaseAuth state
-  //     // await _googleSignIn.disconnect().catchError((_) {});
-  //     // await _googleSignIn.signOut().catchError((_) {});
-  //     // await _auth.signOut().catchError((_) {});
+    try {
+      await _googleSignIn.signOut();
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
-  //     // 🔹 Begin the Google Sign-In flow
-  //     final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-  //     if (googleUser == null) {
-  //       setState(() => isLoading = false);
-  //       return; // User canceled the sign-in process
-  //     }
+      if (googleUser == null) {
+        setState(() => isLoading = false);
+        return;
+      }
 
-  //     // 🔹 Get authentication details
-  //     final GoogleSignInAuthentication googleAuth =
-  //         await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
-  //     if (googleAuth.idToken == null || googleAuth.accessToken == null) {
-  //       throw Exception("Missing Google ID token or access token");
-  //     }
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
 
-  //     // 🔹 Sign in to Firebase with the Google credential
-  //     final AuthCredential credential = GoogleAuthProvider.credential(
-  //       accessToken: googleAuth.accessToken,
-  //       idToken: googleAuth.idToken,
-  //     );
+      final userCredential = await _auth.signInWithCredential(credential);
 
-  //     final UserCredential userCredential = await _auth.signInWithCredential(
-  //       credential,
-  //     );
-  //     final User? firebaseUser = userCredential.user;
+      final firebaseUser = userCredential.user;
 
-  //     if (firebaseUser == null) {
-  //       throw Exception("Firebase user is null");
-  //     }
+      if (firebaseUser == null) {
+        throw Exception("Firebase user is null");
+      }
 
-  //     // 🔹 Call backend (check or create user automatically)
-  //     try {
-  //       final response = await http.post(
-  //         Uri.parse("http://147.93.19.17:5002/api/users/check-google"),
-  //         headers: {"Content-Type": "application/json"},
-  //         body: jsonEncode({
-  //           "email": firebaseUser.email,
-  //           "name": firebaseUser.displayName,
-  //         }),
-  //       );
+      final response = await http.post(
+        Uri.parse("http://147.93.19.17:5002/api/users/check-google"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": firebaseUser.email,
+          "name": firebaseUser.displayName,
+          "photoURL": firebaseUser.photoURL, // 🔥 FIX
+        }),
+      );
 
-  //       // if (response.statusCode == 200) {
-  //       //   final data = jsonDecode(response.body);
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception("Backend error");
+      }
 
-  //       //   // ✅ Always take user object, ignore "exists"
-  //       //   final userModel = UserModel.fromJson(data["user"]);
+      print("STATUS CODE: ${response.statusCode}");
+      print("BODY: ${response.body}");
 
-  //       //   // 🚨 Check if disabled
-  //       //   if (userModel.status == "Disabled") {
-  //       //     ScaffoldMessenger.of(context).showSnackBar(
-  //       //       const SnackBar(
-  //       //         content: Text(
-  //       //           "This account has been disabled by the admin. Please try another email or contact support.",
-  //       //         ),
-  //       //         backgroundColor: Colors.red,
-  //       //       ),
-  //       //     );
-  //       //     return; // stop login
-  //       //   }
+      final data = jsonDecode(response.body);
 
-  //       if (response.statusCode == 200) {
-  //         final data = jsonDecode(response.body);
-  //         print("Backend Response: $data");
-  //         // ✅ Handle both cases (with "user" key or direct object)
-  //         final userData = data["user"] ?? data;
-  //         if (userData == null) {
-  //           throw Exception("User data missing in backend response");
-  //         }
+      if (data == null) {
+        throw Exception("Empty response from backend");
+      }
 
-  //         final userModel = UserModel.fromJson(userData);
+      // ✅ Safe handling
+      final userData = data["user"] != null ? data["user"] : data;
 
-  //         // 🚨 Check if disabled
-  //         if (userModel.status == "Disabled") {
-  //           ScaffoldMessenger.of(context).showSnackBar(
-  //             const SnackBar(
-  //               content: Text(
-  //                 "This account has been disabled by the admin. Please try another email or contact support.",
-  //               ),
-  //               backgroundColor: Colors.red,
-  //             ),
-  //           );
-  //           return; // stop login
-  //         }
+      if (userData == null) {
+        throw Exception("User data missing in response");
+      }
 
-  //         await SessionManager.saveUserSession(userModel.id ?? '');
+      // ✅ Ensure profilePhoto is always set
+      if (userData["profilePhoto"] == null ||
+          userData["profilePhoto"].isEmpty) {
+        userData["profilePhoto"] = userData["photoURL"];
+      }
 
-  //         Navigator.pushReplacement(
-  //           context,
-  //           MaterialPageRoute(builder: (_) => HomeScreen(user: userModel)),
-  //         );
-  //       } else {
-  //         throw Exception("Google Sign-In failed: ${response.body}");
-  //       }
-  //     } catch (e) {
-  //       print("Error during Google Sign-In backend check: $e");
-  //       ScaffoldMessenger.of(
-  //         context,
-  //       ).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
-  //     }
-  //   } catch (e, s) {
-  //     print("Google Sign-In error: $e\n$s");
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
-  //   } finally {
-  //     setState(() => isLoading = false);
-  //   }
-  // }
+      final userModel = UserModel.fromJson(userData);
+
+      await SessionManager.saveUserSession(userModel.id ?? '');
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen(user: userModel)),
+      );
+    } catch (e) {
+      print("Google Sign-In Error: $e");
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Google Sign-In failed")));
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -264,21 +221,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // SizedBox(
-                //   width: double.infinity,
-                //   height: 52,
-                //   child: OutlinedButton.icon(
-                //     onPressed: isLoading ? null : _handleGoogleSignIn,
-                //     icon: Image.asset('assets/icons/google.png', height: 20),
-                //     label: const Text('Continue with Google'),
-                //     style: OutlinedButton.styleFrom(
-                //       side: const BorderSide(color: Colors.grey),
-                //       shape: RoundedRectangleBorder(
-                //         borderRadius: BorderRadius.circular(8),
-                //       ),
-                //     ),
-                //   ),
-                // ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: isLoading ? null : _handleGoogleSignIn,
+                    icon: Image.asset('assets/icons/google.png', height: 20),
+                    label: const Text('Continue with Google'),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,

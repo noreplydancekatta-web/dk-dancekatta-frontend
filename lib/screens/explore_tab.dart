@@ -1208,158 +1208,50 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               ],
                             ),
                             child: InkWell(
-                              onTap: () {
+                              onTap: () async {
                                 try {
                                   final validatedBatchData =
                                       Map<String, dynamic>.from(cls.batchData);
-                                  validatedBatchData['_id'] =
-                                      validatedBatchData['_id'] ?? '';
-                                  validatedBatchData['batchName'] =
-                                      validatedBatchData['batchName'] ??
-                                      'Unknown Batch';
-                                  validatedBatchData['trainer'] =
-                                      validatedBatchData['trainer'] ??
-                                      'Unknown Trainer';
-                                  validatedBatchData['level'] =
-                                      validatedBatchData['level'] ?? '';
-                                  validatedBatchData['branch'] =
-                                      validatedBatchData['branch'] ?? '';
-                                  validatedBatchData['style'] =
-                                      validatedBatchData['style'] ?? '';
-                                  validatedBatchData['days'] =
-                                      validatedBatchData['days'] ?? [];
-                                  validatedBatchData['fee'] =
-                                      validatedBatchData['fee'] ?? '0';
-                                  validatedBatchData['capacity'] =
-                                      validatedBatchData['capacity'] ?? 0;
-                                  validatedBatchData['fromDate'] =
-                                      validatedBatchData['fromDate'] ??
-                                      DateTime.now().toIso8601String();
-                                  validatedBatchData['toDate'] =
-                                      validatedBatchData['toDate'] ??
-                                      DateTime.now().toIso8601String();
-                                  validatedBatchData['startTime'] =
-                                      validatedBatchData['startTime'] ??
-                                      '00:00';
-                                  validatedBatchData['endTime'] =
-                                      validatedBatchData['endTime'] ?? '00:00';
-                                  validatedBatchData['enrolled_students'] =
-                                      validatedBatchData['enrolled_students'] ??
-                                      [];
 
                                   final batchModel = BatchModel.fromJson(
                                     validatedBatchData,
                                   );
-                                  final branchId =
-                                      validatedBatchData['branch']
-                                          ?.toString() ??
-                                      '';
-                                  String branchAddress = 'Unknown Location';
-                                  String branchName = 'Unknown Branch';
-                                  String branchContactNo =
-                                      'Contact not available';
-                                  String trainerName = 'Unknown Trainer';
-
-                                  if (validatedBatchData['branchAddress'] !=
-                                          null &&
-                                      validatedBatchData['branchAddress']
-                                          .toString()
-                                          .isNotEmpty &&
-                                      validatedBatchData['branchAddress']
-                                              .toString() !=
-                                          'N/A') {
-                                    branchAddress =
-                                        validatedBatchData['branchAddress']
-                                            .toString();
-                                  } else {
-                                    branchAddress = getBranchAddress(branchId);
-                                  }
-
-                                  if (validatedBatchData['branchName'] !=
-                                          null &&
-                                      validatedBatchData['branchName']
-                                          .toString()
-                                          .isNotEmpty &&
-                                      validatedBatchData['branchName']
-                                              .toString() !=
-                                          'N/A') {
-                                    branchName =
-                                        validatedBatchData['branchName']
-                                            .toString();
-                                  } else {
-                                    branchName = getBranchName(branchId);
-                                  }
-
-                                  if (validatedBatchData['branchContactNo'] !=
-                                          null &&
-                                      validatedBatchData['branchContactNo']
-                                          .toString()
-                                          .isNotEmpty &&
-                                      validatedBatchData['branchContactNo']
-                                              .toString() !=
-                                          'N/A') {
-                                    branchContactNo =
-                                        validatedBatchData['branchContactNo']
-                                            .toString();
-                                  }
-
-                                  if (validatedBatchData['trainerName'] !=
-                                          null &&
-                                      validatedBatchData['trainerName']
-                                          .toString()
-                                          .isNotEmpty &&
-                                      validatedBatchData['trainerName']
-                                              .toString() !=
-                                          'Unknown Trainer') {
-                                    trainerName =
-                                        validatedBatchData['trainerName']
-                                            .toString();
-                                  } else if (validatedBatchData['trainer'] !=
-                                          null &&
-                                      validatedBatchData['trainer']
-                                          .toString()
-                                          .isNotEmpty &&
-                                      validatedBatchData['trainer']
-                                              .toString() !=
-                                          'Unknown') {
-                                    trainerName = validatedBatchData['trainer']
-                                        .toString();
-                                  }
-
-                                  final branchArea =
-                                      (validatedBatchData['area'] != null &&
-                                          validatedBatchData['area']
-                                              .toString()
-                                              .trim()
-                                              .isNotEmpty)
-                                      ? validatedBatchData['area'].toString()
-                                      : 'Unknown Location';
 
                                   final branchModel = BranchModel(
-                                    id: branchId,
-                                    name: branchName,
-                                    address: branchAddress,
-                                    area: branchArea,
+                                    id:
+                                        cls.batchData['branch']?.toString() ??
+                                        '',
+                                    name:
+                                        cls.batchData['branchName']
+                                            ?.toString() ??
+                                        'Unknown Branch',
+                                    address:
+                                        cls.batchData['branchAddress']
+                                            ?.toString() ??
+                                        'Unknown Location',
+                                    area:
+                                        cls.batchData['area']?.toString() ??
+                                        'Unknown Location',
                                     mapLink: '',
-                                    contactNo: branchContactNo,
+                                    contactNo:
+                                        cls.batchData['branchContactNo']
+                                            ?.toString() ??
+                                        '',
                                   );
 
-                                  Navigator.push(
+                                  final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => BatchDetailScreen(
+                                      builder: (_) => BatchDetailScreen(
                                         batch: batchModel,
                                         branch: branchModel,
-                                        onEnrollmentUpdate: () {
-                                          // Optionally - call refreshBatchSeats(batchModel.id);
-                                          setState(() {
-                                            _danceClassesFuture =
-                                                fetchDanceClasses();
-                                          });
-                                        },
                                       ),
                                     ),
                                   );
+
+                                  if (result == true) {
+                                    setState(() {});
+                                  }
                                 } catch (e) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -1367,7 +1259,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                         'Error loading batch details: ${e.toString()}',
                                       ),
                                       backgroundColor: Colors.red,
-                                      duration: const Duration(seconds: 3),
                                     ),
                                   );
                                 }

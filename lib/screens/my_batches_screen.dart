@@ -12,11 +12,7 @@ class MyBatchesScreen extends StatefulWidget {
   final UserModel user;
   final VoidCallback? goToHomeTab;
 
-  const MyBatchesScreen({
-    super.key,
-    required this.user,
-    this.goToHomeTab,
-  });
+  const MyBatchesScreen({super.key, required this.user, this.goToHomeTab});
 
   @override
   State<MyBatchesScreen> createState() => _MyBatchesScreenState();
@@ -24,7 +20,6 @@ class MyBatchesScreen extends StatefulWidget {
 
 class _MyBatchesScreenState extends State<MyBatchesScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-
   bool isLoading = true;
 
   List<Map<String, dynamic>> enrolledBatches = [];
@@ -40,6 +35,12 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addObserver(this);
     fetchEnrolledBatches();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    fetchEnrolledBatches(); // ensures refresh on tab switch
   }
 
   @override
@@ -235,9 +236,7 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 
   // =============================
@@ -250,11 +249,17 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
     }
 
     if (batches.isEmpty) {
-      return const Center(
-        child: Text(
-          "No batches found",
-          style: TextStyle(color: Colors.grey),
-        ),
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 200),
+          Center(
+            child: Text(
+              "No batches found",
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+        ],
       );
     }
 
@@ -283,11 +288,9 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 // ── Row 1: Title + Download button ──
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
@@ -296,18 +299,6 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () async {
-                        final studio = await fetchStudioById(
-                          batch['studioId'].toString(),
-                        );
-                        await generateInvoice(batch, studio);
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.only(left: 8),
-                        child: Icon(Icons.download, size: 22),
                       ),
                     ),
                   ],
@@ -330,9 +321,7 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: isEnded
-                            ? Colors.grey[200]
-                            : Colors.blue[50],
+                        color: isEnded ? Colors.grey[200] : Colors.blue[50],
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -356,10 +345,8 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
                               initialRating: 0,
                               itemCount: 5,
                               itemSize: 22,
-                              itemBuilder: (_, __) => const Icon(
-                                Icons.star,
-                                color: Colors.amber,
-                              ),
+                              itemBuilder: (_, __) =>
+                                  const Icon(Icons.star, color: Colors.amber),
                               onRatingUpdate: (rating) {
                                 submitRating(
                                   batch['studioId'].toString(),
@@ -398,10 +385,7 @@ class _MyBatchesScreenState extends State<MyBatchesScreen>
           elevation: 0,
           title: const Text(
             "Enrolled Batches",
-            style: TextStyle(
-              color: Colors.black,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
           ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black),

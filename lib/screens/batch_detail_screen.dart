@@ -554,275 +554,281 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
         if (!didPop) Navigator.of(context).pop();
       },
       child: Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          batch.batchName,
-          style: const TextStyle(color: Colors.black),
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          title: Text(
+            batch.batchName,
+            style: const TextStyle(color: Colors.black),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
 
-      // ✅ FLOATING PAY BUTTON - FIXED
-      bottomNavigationBar: _buildFloatingPayButton(totalFee),
+        // ✅ FLOATING PAY BUTTON - FIXED
+        bottomNavigationBar: _buildFloatingPayButton(totalFee),
 
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Studio Info Card
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 8,
-                    color: Colors.grey.shade300,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: logoUrl.isNotEmpty
-                        ? Image.network(
-                            getFullImageUrl(logoUrl),
-                            height: 40,
-                            width: 40,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                                  height: 40,
-                                  width: 40,
-                                  color: Colors.grey[300],
-                                  child: const Icon(
-                                    Icons.store,
-                                    size: 20,
-                                    color: Colors.white,
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Studio Info Card
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 8,
+                      color: Colors.grey.shade300,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: logoUrl.isNotEmpty
+                          ? Image.network(
+                              getFullImageUrl(logoUrl),
+                              height: 40,
+                              width: 40,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                    height: 40,
+                                    width: 40,
+                                    color: Colors.grey[300],
+                                    child: const Icon(
+                                      Icons.store,
+                                      size: 20,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
-                          )
-                        : Container(
-                            height: 40,
-                            width: 40,
-                            color: Colors.grey[300],
-                            child: const Icon(
-                              Icons.store,
-                              size: 20,
-                              color: Colors.white,
+                            )
+                          : Container(
+                              height: 40,
+                              width: 40,
+                              color: Colors.grey[300],
+                              child: const Icon(
+                                Icons.store,
+                                size: 20,
+                                color: Colors.white,
+                              ),
                             ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (isLoadingStudio)
+                          const Text(
+                            "Loading...",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          )
+                        else
+                          Text(
+                            studioName ?? "Studio",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
+                        const SizedBox(height: 4),
+                        if (isLoadingStudio)
+                          const Text(
+                            "Loading...",
+                            style: TextStyle(color: Colors.green),
+                          )
+                        else
+                          Text(
+                            "⭐ ${studioRating.toStringAsFixed(1)} ($studioReviews Reviews)",
+                            style: const TextStyle(color: Colors.green),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Batch Details
+              Text(
+                widget.batch.batchName,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow("Level", getLevelName()),
+              _buildInfoRow("Trainer", getTrainerName()),
+              _buildInfoRow(
+                "Dates",
+                "${_formatDate(widget.batch.fromDate)} to ${_formatDate(widget.batch.toDate)}",
+              ),
+              _buildInfoRow(
+                "Time",
+                "${widget.batch.startTime} - ${widget.batch.endTime}",
+              ),
+
+              // Days chips
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(
+                    width: 100,
+                    child: Text(
+                      "Days",
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (isLoadingStudio)
-                        const Text(
-                          "Loading...",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        )
-                      else
-                        Text(
-                          studioName ?? "Studio",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      const SizedBox(height: 4),
-                      if (isLoadingStudio)
-                        const Text(
-                          "Loading...",
-                          style: TextStyle(color: Colors.green),
-                        )
-                      else
-                        Text(
-                          "⭐ ${studioRating.toStringAsFixed(1)} ($studioReviews Reviews)",
-                          style: const TextStyle(color: Colors.green),
-                        ),
-                    ],
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: widget.batch.days
+                          .map(
+                            (day) => Chip(
+                              label: Text(day),
+                              backgroundColor: Colors.blue[50],
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-            // Batch Details
-            Text(
-              widget.batch.batchName,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            _buildInfoRow("Level", getLevelName()),
-            _buildInfoRow("Trainer", getTrainerName()),
-            _buildInfoRow(
-              "Dates",
-              "${_formatDate(widget.batch.fromDate)} to ${_formatDate(widget.batch.toDate)}",
-            ),
-            _buildInfoRow(
-              "Time",
-              "${widget.batch.startTime} - ${widget.batch.endTime}",
-            ),
-
-            // Days chips
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(
-                  width: 100,
-                  child: Text(
-                    "Days",
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ),
-                Expanded(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: widget.batch.days
-                        .map(
-                          (day) => Chip(
-                            label: Text(day),
-                            backgroundColor: Colors.blue[50],
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            _buildInfoRow("Branch", getBranchName()),
-            _buildInfoRow(
-              "Address",
-              getBranchAddress(),
-              isLink: true,
-              url: getBranchMapLink(),
-            ),
-            _buildInfoRow("Contact", getBranchContact()),
-            _buildInfoRow(
-              "Seats",
-              "${currentBatch.enrolledStudents.length} out of ${currentBatch.capacity}",
-            ),
-            const SizedBox(height: 24),
-
-            // Coupon Section
-            TextField(
-              controller: _couponController,
-              decoration: InputDecoration(
-                hintText: "Enter coupon code",
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: couponError == null && discountAmount > 0
-                        ? Colors.green
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: couponError == null && discountAmount > 0
-                        ? Colors.green
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: couponError == null && discountAmount > 0
-                        ? Colors.green
-                        : Colors.blue,
-                    width: 2.0,
-                  ),
-                ),
+              _buildInfoRow("Branch", getBranchName()),
+              _buildInfoRow(
+                "Address",
+                getBranchAddress(),
+                isLink: true,
+                url: getBranchMapLink(),
               ),
-            ),
-            if (couponError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  couponError!,
-                  style: const TextStyle(color: Colors.red),
-                ),
+              _buildInfoRow("Contact", getBranchContact()),
+              _buildInfoRow(
+                "Seats",
+                "${currentBatch.enrolledStudents.length} out of ${currentBatch.capacity}",
               ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: 100,
-              height: 42,
-              child: ElevatedButton(
-                onPressed: applyCoupon,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00B0FF),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
+              const SizedBox(height: 24),
+
+              // Coupon Section
+              TextField(
+                controller: _couponController,
+                decoration: InputDecoration(
+                  hintText: "Enter coupon code",
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: couponError == null && discountAmount > 0
+                          ? Colors.green
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: couponError == null && discountAmount > 0
+                          ? Colors.green
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: couponError == null && discountAmount > 0
+                          ? Colors.green
+                          : Colors.blue,
+                      width: 2.0,
+                    ),
                   ),
                 ),
-                child: const Text(
-                  "Apply",
-                  style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              if (couponError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    couponError!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: 100,
+                height: 42,
+                child: ElevatedButton(
+                  onPressed: applyCoupon,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00B0FF),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    "Apply",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Fee Breakdown
-            const Text(
-              "Fee Breakdown",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            const SizedBox(height: 12),
-            _buildFeeItem("Tutor Fee:", "₹$tutorFee"),
-            if (discountAmount > 0) ...[
-              _buildFeeItem(
-                "Discount (${((discountAmount / tutorFee) * 100).round()}%):",
-                "-₹$discountAmount",
-                color: Colors.green,
+              // Fee Breakdown
+              const Text(
+                "Fee Breakdown",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
-              _buildFeeItem("Fee after Discount:", "₹$discountedTutorFee"),
-            ],
-            _buildFeeItem(
-              "Convenience Fee ($platformPercent%):",
-              "₹${convenienceFee.toStringAsFixed(2)}",
-            ),
-            _buildFeeItem("GST ($gstPercent%):", "₹${gst.toStringAsFixed(2)}"),
-            const SizedBox(height: 8),
-            const Divider(),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Total Payable:",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              const SizedBox(height: 12),
+              _buildFeeItem("Tutor Fee:", "₹$tutorFee"),
+              if (discountAmount > 0) ...[
+                _buildFeeItem(
+                  "Discount (${((discountAmount / tutorFee) * 100).round()}%):",
+                  "-₹$discountAmount",
+                  color: Colors.green,
                 ),
-                Text(
-                  "₹${totalFee.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
+                _buildFeeItem("Fee after Discount:", "₹$discountedTutorFee"),
               ],
-            ),
-            const SizedBox(height: 20),
-          ],
+              _buildFeeItem(
+                "Convenience Fee ($platformPercent%):",
+                "₹${convenienceFee.toStringAsFixed(2)}",
+              ),
+              _buildFeeItem(
+                "GST ($gstPercent%):",
+                "₹${gst.toStringAsFixed(2)}",
+              ),
+              const SizedBox(height: 8),
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Total Payable:",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                  Text(
+                    "₹${totalFee.toStringAsFixed(2)}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
-      ),
-    ), // closes Scaffold
+      ), // closes Scaffold
     ); // closes PopScope
   }
 
@@ -919,6 +925,7 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
         );
 
         await refreshEnrollment();
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

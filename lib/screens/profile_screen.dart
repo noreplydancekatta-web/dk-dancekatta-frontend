@@ -21,6 +21,8 @@ import '../services/session_manager.dart';
 import '../screens/batch_detail_screen.dart';
 import '../models/batch_model.dart';
 import '../models/branch_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel user;
@@ -146,9 +148,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         currentUser = result;
       });
-    } else {
-      await _refreshUserData();
     }
+
+    // 🔥 ALWAYS refresh from backend (VERY IMPORTANT)
+    await _refreshUserData();
   }
 
   Future<void> _navigateToEditProfile() async {
@@ -205,6 +208,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final shouldLogout = await _showLogoutConfirmation(context);
 
       if (shouldLogout) {
+        // ✅ Firebase logout
+        await FirebaseAuth.instance.signOut();
+
+        final GoogleSignIn googleSignIn = GoogleSignIn();
+
+        // ✅ Safe Google logout
+        try {
+          if (await googleSignIn.isSignedIn()) {
+            await googleSignIn.signOut();
+          }
+        } catch (e) {
+          print("Google signOut error: $e");
+        }
+
+        // ❌ REMOVE disconnect (causes crash)
+        // await googleSignIn.disconnect();
+
+        // ✅ Clear local session
         await SessionManager.clearSession();
 
         if (mounted) {
@@ -216,12 +237,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       print('Error during logout: $e');
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error during logout. Please try again.'),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
       }
     }
   }
@@ -776,7 +796,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mapLink: '',
                 );
 
-                Navigator.push(
+                final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => BatchDetailScreen(
@@ -785,6 +805,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 );
+
+                // 🔥 THIS LINE IS THE FIX
+                if (result == true) {
+                  fetchEnrolledBatches();
+                }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
