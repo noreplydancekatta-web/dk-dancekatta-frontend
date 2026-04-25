@@ -97,9 +97,24 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       }
 
       final Map<String, int> batchCountMap = {};
+      final now = DateTime.now();
       for (var batch in batchList) {
-        final studioId = batch['studioId'].toString();
-        batchCountMap[studioId] = (batchCountMap[studioId] ?? 0) + 1;
+        final rawDate = batch['toDate'];
+        bool isActive = true;
+        if (rawDate != null) {
+          DateTime? endDate;
+          if (rawDate is String) {
+            endDate = DateTime.tryParse(rawDate);
+          }
+          if (endDate != null && !endDate.isAfter(now.subtract(const Duration(days: 1)))) {
+            isActive = false;
+          }
+        }
+        
+        if (isActive) {
+          final studioId = batch['studioId'].toString();
+          batchCountMap[studioId] = (batchCountMap[studioId] ?? 0) + 1;
+        }
       }
 
       final updatedStudios = await Future.wait(

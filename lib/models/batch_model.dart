@@ -12,6 +12,7 @@ class BatchModel {
   final List<String> days;
   final String fee;
   final int capacity;
+  final String? status;
   final List<String> enrolledStudents;
   final DateTime fromDate;
   final DateTime toDate;
@@ -56,9 +57,13 @@ class BatchModel {
     // ✅ FIX: Use 'image' here as well.
     this.image,
     this.branchObject,
+    this.status,
   });
 
-  factory BatchModel.fromJson(Map<String, dynamic> json, {BranchModel? branchObject}) {
+  factory BatchModel.fromJson(
+    Map<String, dynamic> json, {
+    BranchModel? branchObject,
+  }) {
     try {
       // ID
       final id = json['_id'] is Map
@@ -90,62 +95,78 @@ class BatchModel {
       if (json['branch'] is Map) {
         final branchMap = json['branch'];
         branch = branchMap['_id']?.toString() ?? '';
-        branchName = branchMap['branchName']?.toString()
-            ?? branchMap['name']?.toString()
-            ?? 'Unknown Branch';
-        branchAddress = branchMap['branchAddress']?.toString()
-            ?? branchMap['address']?.toString()
-            ?? 'Address not available';
-        branchContactNo = branchMap['contactNumber']?.toString()
-            ?? branchMap['contactNo']?.toString()
-            ?? 'Contact not available';
+        branchName =
+            branchMap['branchName']?.toString() ??
+            branchMap['name']?.toString() ??
+            'Unknown Branch';
+        branchAddress =
+            branchMap['branchAddress']?.toString() ??
+            branchMap['address']?.toString() ??
+            'Address not available';
+        branchContactNo =
+            branchMap['contactNumber']?.toString() ??
+            branchMap['contactNo']?.toString() ??
+            'Contact not available';
         // ✅ FIX: Extract the image URL.
         branchImage = branchMap['image']?.toString();
       } else {
         // ✅ Preserve plain string like "Unknown Location"
         branch = json['branch']?.toString() ?? '';
         branchName = json['branchName']?.toString() ?? branch;
-        branchAddress = json['branchAddress']?.toString() ?? 'Address not available';
-        branchContactNo = json['branchContactNo']?.toString() ?? 'Contact not available';
+        branchAddress =
+            json['branchAddress']?.toString() ?? 'Address not available';
+        branchContactNo =
+            json['branchContactNo']?.toString() ?? 'Contact not available';
       }
 
       // Trainer
       String trainer = '';
       String? trainerName;
 
-// 1️⃣ If 'trainer' is a string, use it
-      if (json['trainer'] != null && json['trainer'] is String && json['trainer'].toString().trim().isNotEmpty) {
+      // 1️⃣ If 'trainer' is a string, use it
+      if (json['trainer'] != null &&
+          json['trainer'] is String &&
+          json['trainer'].toString().trim().isNotEmpty) {
         trainer = json['trainer'].toString().trim();
         trainerName = trainer;
       }
-// 2️⃣ If 'trainer' is a Map, parse object
+      // 2️⃣ If 'trainer' is a Map, parse object
       else if (json['trainer'] is Map) {
         final trainerMap = json['trainer'];
         String name = '';
-        if (trainerMap['firstName'] != null) name += trainerMap['firstName'].toString();
-        if (trainerMap['lastName'] != null) name += ' ' + trainerMap['lastName'].toString();
+        if (trainerMap['firstName'] != null)
+          name += trainerMap['firstName'].toString();
+        if (trainerMap['lastName'] != null)
+          name += ' ' + trainerMap['lastName'].toString();
         name = name.trim();
-        if (name.isNotEmpty) trainerName = name;
-        else if (trainerMap['name'] != null && trainerMap['name'].toString().trim().isNotEmpty) {
+        if (name.isNotEmpty)
+          trainerName = name;
+        else if (trainerMap['name'] != null &&
+            trainerMap['name'].toString().trim().isNotEmpty) {
           trainerName = trainerMap['name'].toString();
         }
       }
-// 3️⃣ If still null or "unknown", try trainerName from JSON
-      if ((trainerName == null || trainerName.trim().isEmpty || trainerName.toLowerCase() == 'unknown') &&
+      // 3️⃣ If still null or "unknown", try trainerName from JSON
+      if ((trainerName == null ||
+              trainerName.trim().isEmpty ||
+              trainerName.toLowerCase() == 'unknown') &&
           json['trainerName'] != null &&
           json['trainerName'].toString().trim().isNotEmpty &&
           json['trainerName'].toString().trim().toLowerCase() != 'unknown') {
         trainerName = json['trainerName'].toString();
       }
-// 4️⃣ Fallback
-      if (trainerName == null || trainerName.trim().isEmpty || trainerName.toLowerCase() == 'unknown') {
+      // 4️⃣ Fallback
+      if (trainerName == null ||
+          trainerName.trim().isEmpty ||
+          trainerName.toLowerCase() == 'unknown') {
         trainerName = 'Unknown Trainer';
       }
 
       // 5️⃣ Extra check if trainerName is still "Unknown Trainer"
       if (trainerName.toLowerCase() == 'unknown trainer') {
         // Example: check another field that backend might send
-        if (json['realTrainerName'] != null && json['realTrainerName'].toString().trim().isNotEmpty) {
+        if (json['realTrainerName'] != null &&
+            json['realTrainerName'].toString().trim().isNotEmpty) {
           trainerName = json['realTrainerName'].toString().trim();
         }
         // Or check nested trainer object
@@ -157,9 +178,6 @@ class BatchModel {
           if (name.trim().isNotEmpty) trainerName = name.trim();
         }
       }
-
-
-
 
       // Days - supports List<String>, List<dynamic>, or comma-separated string
       final List<String> days = (() {
@@ -228,6 +246,7 @@ class BatchModel {
         endTime: json['endTime']?.toString() ?? '00:00',
         studioName: json['studioName']?.toString() ?? 'Unknown Studio',
         studioId: json['studioId']?.toString(),
+        status: json['status']?.toString(),
         levelName: levelName,
         styleName: styleName,
         branchName: branchName,
@@ -257,6 +276,7 @@ class BatchModel {
         endTime: '00:00',
         studioName: 'Unknown Studio',
         studioId: null,
+        status: null,
         levelName: null,
         styleName: null,
         branchName: null,
@@ -288,6 +308,7 @@ class BatchModel {
       'endTime': endTime,
       'studioName': studioName,
       'studioId': studioId,
+      'status': status,
       'levelName': levelName,
       'branchName': branchName,
       'styleName': styleName,

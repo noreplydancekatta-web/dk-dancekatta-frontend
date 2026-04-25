@@ -637,12 +637,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         "instagram": _instagramController.text,
         "isProfessional": _isProfessional,
         "experience": _experienceController.text,
-        "profilePhoto":
-            (_profilePhoto != null && _profilePhoto!.startsWith('/uploads/'))
-            ? _profilePhoto
-            : (_profilePhoto != null && _profilePhoto!.startsWith('http'))
-            ? Uri.parse(_profilePhoto!).path
-            : _profilePhoto,
+        "profilePhoto": _profilePhoto,
         "skills": _skills,
       };
 

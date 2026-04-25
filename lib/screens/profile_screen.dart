@@ -40,7 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Set<String> ratedBatchIds = {};
   bool isLoading = true;
   bool isExpanded = false;
-  bool isUserLoading = true; // ✅ NEW: prevents flicker during initial load
+  bool isUserLoading = true;
   Map<String, dynamic>? studio;
   Map<String, dynamic>? platformFeeData;
 
@@ -124,11 +124,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (updatedUser != null) {
         setState(() {
           currentUser = updatedUser;
-          isUserLoading = false; // ✅ Mark done only after real data arrives
+          isUserLoading = false;
         });
       } else {
         setState(() {
-          isUserLoading = false; // ✅ Still mark done even if fetch failed
+          isUserLoading = false;
         });
       }
     } else {
@@ -150,7 +150,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
 
-    // 🔥 ALWAYS refresh from backend (VERY IMPORTANT)
     await _refreshUserData();
   }
 
@@ -208,12 +207,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final shouldLogout = await _showLogoutConfirmation(context);
 
       if (shouldLogout) {
-        // ✅ Firebase logout
         await FirebaseAuth.instance.signOut();
 
         final GoogleSignIn googleSignIn = GoogleSignIn();
 
-        // ✅ Safe Google logout
         try {
           if (await googleSignIn.isSignedIn()) {
             await googleSignIn.signOut();
@@ -222,10 +219,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           print("Google signOut error: $e");
         }
 
-        // ❌ REMOVE disconnect (causes crash)
-        // await googleSignIn.disconnect();
-
-        // ✅ Clear local session
         await SessionManager.clearSession();
 
         if (mounted) {
@@ -303,14 +296,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return fallback;
   }
 
-  Future<Map<String, dynamic>> fetchOwner(String ownerId) async {
-    final response = await http.get(
-      Uri.parse('http://147.93.19.17:5002/api/users/$ownerId'),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to fetch owner');
+  Future<Map<String, dynamic>?> fetchOwner(String ownerId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://147.93.19.17:5002/api/users/$ownerId'),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        print("Owner not found: ${response.statusCode}");
+        return null; // ✅ DO NOT THROW
+      }
+    } catch (e) {
+      print("Error fetching owner: $e");
+      return null; // ✅ DO NOT THROW
     }
   }
 
@@ -354,28 +354,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Map<String, dynamic>? studio,
     Map<String, dynamic>? owner,
   ) async {
-    if (owner == null && studio != null) {
-      owner = await fetchOwner(studio['ownerId']);
+    try {
+      if (owner == null && studio != null && studio['ownerId'] != null) {
+        owner = await fetchOwner(studio['ownerId']);
+      }
+    } catch (e) {
+      print("⚠️ Owner fetch failed: $e");
+      owner = null; // continue without owner
     }
 
-    final roboto = pw.Font.ttf(
-      await rootBundle.load("assets/fonts/Roboto-VariableFont_wdth,wght.ttf"),
-    );
+    // ─────────────────────────────────────────────────────────────
+    // Field resolver for new vs old transactions
+    // OLD transactions: style, level, fee, fromDate, toDate stored flat.
+    // NEW transactions: batchId is a populated nested object.
+    // txnField() checks flat first, then falls back to nested batchId.
+    // ─────────────────────────────────────────────────────────────
+    final dynamic rawBatchId = txn['batchId'];
+    final Map<String, dynamic> batchFields = rawBatchId is Map
+        ? Map<String, dynamic>.from(rawBatchId)
+        : {};
 
-    final robotoItalic = pw.Font.ttf(
-      await rootBundle.load(
-        "assets/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf",
-      ),
-    );
+    String txnField(String key) {
+      final flat = txn[key];
+      if (flat != null && flat.toString().isNotEmpty) return flat.toString();
+      return batchFields[key]?.toString() ?? '';
+    }
+    // ─────────────────────────────────────────────────────────────
 
     final pdf = pw.Document();
     final DateTime now = DateTime.now();
-    final DateTime fromDate = DateTime.tryParse(txn['fromDate'] ?? '') ?? now;
-    final DateTime toDate = DateTime.tryParse(txn['toDate'] ?? '') ?? now;
 
-    final double tutorFee = _parseDouble(txn['fee']);
+    final DateTime fromDate = DateTime.tryParse(txnField('fromDate')) ?? now;
+    final DateTime toDate = DateTime.tryParse(txnField('toDate')) ?? now;
+    final double tutorFee = _parseDouble(
+      txnField('fee').isNotEmpty ? txnField('fee') : null,
+    );
+
     final double discountAmount = _parseDouble(txn['discountAmount']);
-    print('DEBUG: discountAmount = $discountAmount');
     final double discountedTutorFee = tutorFee - discountAmount;
 
     final double platformPercent = _parseDouble(
@@ -387,8 +402,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final double platformFee = (discountedTutorFee * platformPercent) / 100;
     final double gstOnPlatformFee = (platformFee * gstPercent) / 100;
 
-    final double expectedTotal = tutorFee + platformFee + gstOnPlatformFee;
-
     final double totalFee = discountedTutorFee + platformFee + gstOnPlatformFee;
 
     final double totalAmountPaid = _parseDouble(txn['paymentAmount'], totalFee);
@@ -399,15 +412,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? DateTime.tryParse(txn['paymentDate']) ?? now
         : now;
 
+    // ─────────────────────────────────────────────────────────────
+    // NOTE: We use "Rs." instead of "₹" because the default PDF
+    // fonts (Helvetica/Times) do not include the rupee glyph and
+    // will throw an encoding error at render time.
+    // To use "₹", load a TTF font (e.g. Roboto) that supports it
+    // and pass it via pw.ThemeData.withFont(base: yourFont).
+    // ─────────────────────────────────────────────────────────────
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(24),
-        theme: pw.ThemeData.withFont(
-          base: roboto,
-          italic: robotoItalic,
-          fontFallback: [roboto],
-        ),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -436,10 +452,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         'Address: ${studio?['registeredAddress'] ?? 'Not Provided'}',
                         style: pw.TextStyle(fontSize: 10),
                       ),
-                      if (studio?['gstNumber'] != null &&
-                          studio!['gstNumber'].toString().isNotEmpty)
+                      if (studio != null &&
+                          studio['gstNumber'] != null &&
+                          studio['gstNumber'].toString().isNotEmpty)
                         pw.Text(
-                          'GSTIN: ${studio!['gstNumber']}',
+                          'GSTIN: ${studio?['gstNumber'] ?? ''}',
                           style: pw.TextStyle(fontSize: 10),
                         ),
                     ],
@@ -567,7 +584,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('${txn['style']} - ${txn['level']}'),
+                          pw.Text(
+                            '${txnField('style')} - ${txnField('level')}',
+                          ),
                           pw.Text(
                             'Transaction ID: ${txn['razorpayPaymentId'] ?? 'N/A'}',
                             style: pw.TextStyle(fontSize: 10),
@@ -577,20 +596,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     pw.Expanded(
                       flex: 3,
-                      child: pw.Text('₹${tutorFee.toStringAsFixed(2)}'),
+                      // FIX: "Rs." instead of "₹" — default PDF fonts lack the rupee glyph
+                      child: pw.Text('Rs.${tutorFee.toStringAsFixed(2)}'),
                     ),
                     pw.Expanded(
                       flex: 3,
                       child: pw.Text(
                         discountAmount > 0
-                            ? '-₹${discountAmount.toStringAsFixed(2)}'
-                            : '₹0.00',
+                            ? '-Rs.${discountAmount.toStringAsFixed(2)}'
+                            : 'Rs.0.00',
                       ),
                     ),
                     pw.Expanded(
                       flex: 3,
                       child: pw.Text(
-                        '₹${(tutorFee - discountAmount).toStringAsFixed(2)}',
+                        'Rs.${(tutorFee - discountAmount).toStringAsFixed(2)}',
                       ),
                     ),
                   ],
@@ -611,10 +631,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           children: [
                             pw.Text(
-                              'Discount (- ₹${discountAmount.toStringAsFixed(2)} '
-                              '(${((discountAmount / tutorFee) * 100).round()}%))',
+                              'Discount (- Rs.${discountAmount.toStringAsFixed(2)} '
+                              '(${tutorFee > 0 ? ((discountAmount / tutorFee) * 100).round() : 0}%)',
                             ),
-                            pw.Text('-₹${discountAmount.toStringAsFixed(2)}'),
+                            pw.Text('-Rs.${discountAmount.toStringAsFixed(2)}'),
                           ],
                         ),
                         pw.Row(
@@ -622,20 +642,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             pw.Text('Fee after Discount'),
                             pw.Text(
-                              '₹${(tutorFee - discountAmount).toStringAsFixed(2)}',
+                              'Rs.${(tutorFee - discountAmount).toStringAsFixed(2)}',
                             ),
                           ],
                         ),
                       ] else ...[
                         pw.Row(
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                          children: [pw.Text('Discount'), pw.Text('₹0.00')],
+                          children: [pw.Text('Discount'), pw.Text('Rs.0.00')],
                         ),
                         pw.Row(
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           children: [
                             pw.Text('Fee after Discount'),
-                            pw.Text('₹${tutorFee.toStringAsFixed(2)}'),
+                            pw.Text('Rs.${tutorFee.toStringAsFixed(2)}'),
                           ],
                         ),
                       ],
@@ -645,7 +665,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           pw.Text(
                             'Platform Fee ${platformPercent.toStringAsFixed(0)}%',
                           ),
-                          pw.Text('₹${platformFee.toStringAsFixed(2)}'),
+                          pw.Text('Rs.${platformFee.toStringAsFixed(2)}'),
                         ],
                       ),
                       pw.Row(
@@ -654,7 +674,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           pw.Text(
                             'GST on Platform Fee ${gstPercent.toStringAsFixed(0)}%',
                           ),
-                          pw.Text('₹${gstOnPlatformFee.toStringAsFixed(2)}'),
+                          pw.Text('Rs.${gstOnPlatformFee.toStringAsFixed(2)}'),
                         ],
                       ),
                       pw.Divider(),
@@ -666,7 +686,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                           ),
                           pw.Text(
-                            '₹${totalAmountPaid.toStringAsFixed(2)}',
+                            'Rs.${totalAmountPaid.toStringAsFixed(2)}',
                             style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                           ),
                         ],
@@ -682,7 +702,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
               ),
               pw.Text(
-                '₹${totalAmountPaid.toStringAsFixed(2)} was paid on ${paymentDate.day}-${paymentDate.month}-${paymentDate.year} via ${txn['paymentMethod'] ?? 'Online'}',
+                'Rs.${totalAmountPaid.toStringAsFixed(2)} was paid on '
+                '${paymentDate.day}-${paymentDate.month}-${paymentDate.year} '
+                'via ${txn['paymentMethod'] ?? 'Online'}',
                 style: pw.TextStyle(fontSize: 10),
               ),
 
@@ -693,7 +715,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               if (discountAmount > 0)
                 pw.Text(
-                  '${couponCode ?? "Coupon"} - ₹${discountAmount.toStringAsFixed(2)} '
+                  '${couponCode ?? "Coupon"} - Rs.${discountAmount.toStringAsFixed(2)} '
                   '(${tutorFee > 0 ? ((discountAmount / tutorFee) * 100).round() : 0}%)',
                   style: pw.TextStyle(fontSize: 10),
                 )
@@ -741,10 +763,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final isRated = ratedBatchIds.contains(
           batch['batchId'] as String? ?? '',
         );
+        final rawBatchId = batch['batchId'];
+        final batchFields = rawBatchId is Map
+            ? Map<String, dynamic>.from(rawBatchId)
+            : {};
+
+        String getField(String key) {
+          final flat = batch[key];
+          if (flat != null && flat.toString().isNotEmpty)
+            return flat.toString();
+          return batchFields[key]?.toString() ?? '';
+        }
+
         final isEnded =
-            DateTime.tryParse(
-              batch['toDate'] ?? '',
-            )?.isBefore(DateTime.now()) ??
+            DateTime.tryParse(getField('toDate'))?.isBefore(DateTime.now()) ??
             false;
         final statusText = isEnded ? 'Ended' : 'Active';
 
@@ -806,7 +838,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 );
 
-                // 🔥 THIS LINE IS THE FIX
                 if (result == true) {
                   fetchEnrolledBatches();
                 }
@@ -851,7 +882,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "${batch['style']} • ${batch['level']}",
+                      "${getField('style')} • ${getField('level')}",
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     Text(
@@ -866,7 +897,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: 4),
                 Text(batch['studioName'] ?? 'Studio'),
-                Text("Payment Successful ₹${batch['paymentAmount'] ?? '0'}/-"),
+                Text(
+                  "Payment Successful Rs.${batch['paymentAmount'] ?? '0'}/-",
+                ),
                 const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -886,26 +919,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     color: Colors.amber,
                                   ),
                                   onRatingUpdate: (rating) {
+                                    final rawBatchId = batch['batchId'];
+                                    final batchId = rawBatchId is Map
+                                        ? rawBatchId['_id']?.toString()
+                                        : rawBatchId?.toString();
+
+                                    final rawStudioId = batch['studioId'];
+                                    final studioId = rawStudioId is Map
+                                        ? rawStudioId['_id']?.toString()
+                                        : rawStudioId?.toString();
+
                                     submitRating(
-                                      batch['studioId'].toString(),
-                                      batch['batchId'].toString(),
+                                      studioId ?? '',
+                                      batchId ?? '',
                                       rating,
                                     );
                                   },
                                 )
                         : const SizedBox(),
+
                     IconButton(
                       icon: const Icon(Icons.download, size: 22),
                       onPressed: () async {
-                        final studioData = await fetchStudioById(
-                          batch['studioId'],
-                        );
-                        await generateInvoice(
-                          batch,
-                          currentUser,
-                          studioData,
-                          null,
-                        );
+                        try {
+                          final rawStudioId = batch['studioId'];
+
+                          // Extract studioId safely
+                          final studioId = rawStudioId is Map
+                              ? rawStudioId['_id']?.toString()
+                              : rawStudioId?.toString();
+
+                          print("DEBUG batch: $batch");
+                          print("DEBUG studioId: $studioId");
+
+                          // Handle both new & old data formats
+                          Map<String, dynamic>? studioData;
+
+                          if (rawStudioId is Map) {
+                            // NEW format: studioId is already a populated object
+                            studioData = Map<String, dynamic>.from(rawStudioId);
+                          } else if (studioId != null) {
+                            // OLD format: fetch studio data from API
+                            studioData = await fetchStudioById(studioId);
+                          }
+
+                          // Validate transaction data
+                          if (batch['paymentAmount'] == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Invalid transaction data"),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // Generate invoice (studioData may be null — handled gracefully)
+                          await generateInvoice(
+                            batch,
+                            currentUser,
+                            studioData,
+                            null,
+                          );
+                        } catch (e, stack) {
+                          // Improved error logging to help diagnose future issues
+                          print("Invoice error: $e");
+                          print("Invoice stack trace: $stack");
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Invoice generation failed: $e"),
+                            ),
+                          );
+                        }
                       },
                     ),
                   ],
@@ -918,69 +1002,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ✅ Extracted studio tile builder — clean and reusable
-  // Widget _buildStudioTile() {
-  //   // Show a slim placeholder while user data is still loading
-  //   if (isUserLoading) {
-  //     return const Padding(
-  //       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-  //       child: SizedBox(
-  //         height: 48,
-  //         child: Center(
-  //           child: LinearProgressIndicator(),
-  //         ),
-  //       ),
-  //     );
-  //   }
-
-  //   if (currentUser.isProfessionalChoreographer != true) {
-  //     return const SizedBox.shrink();
-  //   }
-
-  //   final rawStatus = currentUser.studioStatus;
-
-  //   if (rawStatus == null || rawStatus.trim().isEmpty) {
-  //     return _buildListTile(
-  //       "Create Studio Profile",
-  //       Icons.add_business,
-  //       _navigateToStudioRegistration,
-  //     );
-  //   }
-
-  //   final status = rawStatus.trim().toLowerCase();
-
-  //   if (status == 'pending') {
-  //     return _buildStatusContainer(
-  //       title: "Studio Under Review",
-  //       subtitle: "Your studio is under verification",
-  //       icon: Icons.hourglass_top,
-  //       bgColor: Colors.orange,
-  //     );
-  //   }
-
-  //   if (status == 'approved') {
-  //     return _buildStatusContainer(
-  //       title: "Studio Approved",
-  //       subtitle: "Manage your studio on DanceKatta",
-  //       icon: Icons.check_circle,
-  //       bgColor: Colors.green,
-  //     );
-  //   }
-
-  //   if (status == 'disabled') {
-  //     return _buildStatusContainer(
-  //       title: "Studio Disabled",
-  //       subtitle: "Your studio has been disabled",
-  //       icon: Icons.block,
-  //       bgColor: Colors.red,
-  //     );
-  //   }
-
-  // rejected or unknown — show nothing
-  // return const SizedBox.shrink();
-  // }
   Widget _buildStudioTile() {
-    // Show a placeholder while user data is loading
     if (isUserLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -991,12 +1013,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // Only professional choreographers can create studios
     if (!currentUser.isProfessionalChoreographer) {
       return const SizedBox.shrink();
     }
 
-    // Only choreographers with >= 1 year experience
     final double experienceYears =
         double.tryParse(currentUser.experience ?? "0") ?? 0;
     if (experienceYears < 1) {
@@ -1005,7 +1025,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final rawStatus = currentUser.studioStatus?.trim().toLowerCase() ?? '';
 
-    // No studio yet → show create button
     if (rawStatus.isEmpty) {
       return _buildListTile(
         "Create Studio Profile",
@@ -1014,7 +1033,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // Studio exists → show status
     switch (rawStatus) {
       case 'pending':
         return _buildStatusContainer(
@@ -1042,7 +1060,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ✅ Shared container for all studio status tiles
   Widget _buildStatusContainer({
     required String title,
     required String subtitle,
@@ -1070,7 +1087,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        Navigator.pop(context); // goes back to HomeTab
+        Navigator.pop(context);
         return false;
       },
       child: Scaffold(
@@ -1140,7 +1157,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _navigateToEditProfile,
                 ),
 
-              // ✅ Single clean call — no flicker, no inline IIFE
               _buildStudioTile(),
 
               const Divider(height: 32),
@@ -1155,7 +1171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   try {
                     await launchUrl(url, mode: LaunchMode.externalApplication);
                   } catch (e) {
-                    print("❌ Could not launch $url: $e");
+                    print("Could not launch $url: $e");
                   }
                 },
                 customIcon: Image.asset(

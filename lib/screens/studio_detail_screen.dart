@@ -261,44 +261,38 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
   // }
 
   Future<void> fetchBatchesForBranch() async {
+    if (branches.isEmpty) return;
+
     setState(() {
       isLoadingBatches = true;
       errorBatches = null;
     });
 
     try {
-      print(
-        '🔄 Fetching batches for studio: ${widget.studio.id.oid}, branch: ${branches[selectedBranchIndex].id}',
-      );
+      final branchId = branches[selectedBranchIndex].id;
 
-      // If using a default branch, fetch all batches for the studio
-      if (branches[selectedBranchIndex].id.startsWith('default-')) {
-        print('🔄 Using default branch, fetching all studio batches');
-        await fetchBatchesForStudio();
-        return;
-      }
-
-      // Try the batch service first
       final result = await BatchService.getBatchesByStudioAndBranch(
         widget.studio.id.oid,
-        branches[selectedBranchIndex].id,
+        branchId,
       );
 
-      if (result.isNotEmpty) {
-        setState(() {
-          batches = result;
-          isLoadingBatches = false;
-        });
-        print('✅ Fetched ${result.length} batches using BatchService');
-      } else {
-        print('⚠️ No batches found using BatchService, trying direct API call');
-        // Fallback to direct API call
-        await fetchBatchesDirectly();
-      }
+      final now = DateTime.now();
+
+      // ✅ FILTER ACTIVE BATCHES ONLY
+      final activeBatches = result.where((batch) {
+        final endDate = batch.toDate;
+        return endDate.isAfter(now.subtract(const Duration(days: 1)));
+      }).toList();
+
+      setState(() {
+        batches = activeBatches;
+        isLoadingBatches = false;
+      });
     } catch (e) {
-      print('❌ BatchService failed: $e');
-      // Fallback to direct API call
-      await fetchBatchesDirectly();
+      setState(() {
+        errorBatches = e.toString();
+        isLoadingBatches = false;
+      });
     }
   }
 
@@ -319,8 +313,13 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
         print('✅ Fetched ${data.length} batches directly');
 
         if (data.isNotEmpty && mounted) {
+          final now = DateTime.now();
+          final active = data.map((e) => BatchModel.fromJson(e)).where((b) {
+            final end = b.toDate;
+            return end.isAfter(now.subtract(const Duration(days: 1)));
+          }).toList();
           setState(() {
-            batches = data.map((e) => BatchModel.fromJson(e)).toList();
+            batches = active;
             isLoadingBatches = false;
           });
         } else if (mounted) {
@@ -362,8 +361,13 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
         print('✅ Fetched ${data.length} batches without branch filter');
 
         if (data.isNotEmpty && mounted) {
+          final now = DateTime.now();
+          final active = data.map((e) => BatchModel.fromJson(e)).where((b) {
+            final end = b.toDate;
+            return end.isAfter(now.subtract(const Duration(days: 1)));
+          }).toList();
           setState(() {
-            batches = data.map((e) => BatchModel.fromJson(e)).toList();
+            batches = active;
             isLoadingBatches = false;
           });
         } else if (mounted) {
@@ -404,8 +408,13 @@ class _StudioDetailScreenState extends State<StudioDetailScreen> {
         print('✅ Fetched ${data.length} batches for studio');
 
         if (data.isNotEmpty && mounted) {
+          final now = DateTime.now();
+          final active = data.map((e) => BatchModel.fromJson(e)).where((b) {
+            final end = b.toDate;
+            return end.isAfter(now.subtract(const Duration(days: 1)));
+          }).toList();
           setState(() {
-            batches = data.map((e) => BatchModel.fromJson(e)).toList();
+            batches = active;
             isLoadingBatches = false;
           });
         } else if (mounted) {

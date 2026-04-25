@@ -131,10 +131,29 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception("User data missing in response");
       }
 
-      // ✅ Ensure profilePhoto is always set
-      if (userData["profilePhoto"] == null ||
-          userData["profilePhoto"].isEmpty) {
-        userData["profilePhoto"] = userData["photoURL"];
+      // ✅ Fix corrupted or missing profilePhoto
+      final currentPhoto = userData["profilePhoto"]?.toString();
+      final isMissing = currentPhoto == null || currentPhoto.isEmpty;
+      final isCorrupt = !isMissing && !currentPhoto.startsWith('http') && !currentPhoto.startsWith('/uploads/');
+
+      if (isMissing || isCorrupt) {
+        userData["profilePhoto"] = firebaseUser.photoURL;
+        
+        // Update backend to persist the Google photo so it doesn't vanish on refresh
+        if (firebaseUser.photoURL != null && firebaseUser.photoURL!.isNotEmpty) {
+          try {
+            final userId = userData["_id"] ?? userData["id"];
+            if (userId != null) {
+              await http.put(
+                Uri.parse("http://147.93.19.17:5002/api/users/$userId"),
+                headers: {"Content-Type": "application/json"},
+                body: jsonEncode({"profilePhoto": firebaseUser.photoURL}),
+              );
+            }
+          } catch (e) {
+            print("Failed to persist Google photo: $e");
+          }
+        }
       }
 
       final userModel = UserModel.fromJson(userData);

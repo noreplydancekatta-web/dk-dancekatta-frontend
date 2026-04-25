@@ -546,7 +546,7 @@ class _BatchDetailScreenState extends State<BatchDetailScreen> {
 
     double convenienceFee = (discountedTutorFee * platformPercent) / 100;
     double gst = (convenienceFee * gstPercent) / 100;
-    double totalFee = discountedTutorFee + convenienceFee + gst;
+    double totalFee = (discountedTutorFee + convenienceFee + gst).roundToDouble();
 
     return PopScope(
       canPop: false,

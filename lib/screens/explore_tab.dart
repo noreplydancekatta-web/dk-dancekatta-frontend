@@ -274,354 +274,56 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   Future<List<DanceClass>> fetchDanceClasses() async {
     try {
-      final queryParameters = {};
-      print('🎯 Building query parameters...');
-      print('Selected Styles: $_selectedStyles');
-      print('Selected Levels: $_selectedLevels');
-      print('Selected Studios: $_selectedStudios');
-      print('Selected Locations: $_selectedLocations');
-      print('Selected Days: $_selectedDays');
-
-      if (_selectedStyles.isNotEmpty) {
-        final styleIds = _selectedStyles
-            .map((name) {
-              final style = _styleList.firstWhere(
-                (s) => s['name'] == name,
-                orElse: () => {},
-              );
-              final id = style['_id']?.toString() ?? '';
-              print(
-                '🔍 Style "$name" -> ID: $id (valid: ${isValidObjectId(id)})',
-              );
-              if (id.isNotEmpty && !isValidObjectId(id)) {
-                print('⚠️ Invalid style ID: $id for name: $name');
-                return '';
-              }
-              return id;
-            })
-            .where((id) => id.isNotEmpty)
-            .toList();
-        if (styleIds.isNotEmpty) {
-          queryParameters['style'] = styleIds.join(',');
-          print('✅ Style IDs: $styleIds');
-        } else {
-          print('⚠️ No valid style IDs found, skipping style filter');
-        }
-      }
-
-      if (_selectedLevels.isNotEmpty) {
-        final levelIds = _selectedLevels
-            .map((name) {
-              final level = _levelList.firstWhere(
-                (l) => l['name'] == name,
-                orElse: () => {},
-              );
-              final id = level['_id']?.toString() ?? '';
-              print(
-                '🔍 Level "$name" -> ID: $id (valid: ${isValidObjectId(id)})',
-              );
-              if (id.isNotEmpty && !isValidObjectId(id)) {
-                print('⚠️ Invalid level ID: $id for name: $name');
-                return '';
-              }
-              return id;
-            })
-            .where((id) => id.isNotEmpty)
-            .toList();
-        if (levelIds.isNotEmpty) {
-          queryParameters['level'] = levelIds.join(',');
-          print('✅ Level IDs: $levelIds');
-        } else {
-          print('⚠️ No valid level IDs found, skipping level filter');
-        }
-      }
-
-      if (_selectedStudios.isNotEmpty) {
-        final studioIds = _selectedStudios
-            .map((name) {
-              final studio = _studioList.firstWhere(
-                (s) => s['studioName'] == name,
-                orElse: () => {},
-              );
-              final id = studio['_id']?.toString() ?? '';
-              print(
-                '🔍 Studio "$name" -> ID: $id (valid: ${isValidObjectId(id)})',
-              );
-              if (id.isNotEmpty && !isValidObjectId(id)) {
-                print('⚠️ Invalid studio ID: $id for name: $name');
-                return '';
-              }
-              return id;
-            })
-            .where((id) => id.isNotEmpty)
-            .toList();
-        if (studioIds.isNotEmpty) {
-          queryParameters['studioId'] = studioIds.join(',');
-          print('✅ Studio IDs: $studioIds');
-        } else {
-          print('⚠️ No valid studio IDs found, skipping studio filter');
-        }
-      }
-
-      if (_selectedLocations.isNotEmpty) {
-        final selectedBranchIds = _selectedLocations
-            .map((address) {
-              final branch = _branchList.firstWhere(
-                (b) => b['branchAddress'] == address,
-                orElse: () => {},
-              );
-              final id = branch['_id']?.toString() ?? '';
-              print(
-                '🔍 Location "$address" -> ID: $id (valid: ${isValidObjectId(id)})',
-              );
-              if (id.isNotEmpty && !isValidObjectId(id)) {
-                print('⚠️ Invalid branch ID: $id for address: $address');
-                return '';
-              }
-              return id;
-            })
-            .where((id) => id.isNotEmpty)
-            .toList();
-        if (selectedBranchIds.isNotEmpty) {
-          queryParameters['branchId'] = selectedBranchIds.join(',');
-          print('✅ Branch IDs: $selectedBranchIds');
-        } else {
-          print('⚠️ No valid branch IDs found, skipping location filter');
-        }
-      }
-
-      if (_selectedDays.isNotEmpty) {
-        queryParameters['days'] = _selectedDays.join(',');
-        print('✅ Days: $_selectedDays');
-      }
-
-      final Uri uri = queryParameters.isEmpty
-          ? Uri.parse('$baseUrl/api/batches')
-          : Uri.parse('$baseUrl/api/batches/filter').replace(
-              queryParameters: queryParameters.map(
-                (key, value) => MapEntry(key.toString(), value.toString()),
-              ),
-            );
-
-      print('🔗 Making request to: $uri');
-
-      // Example of making the request
-      try {
-        final response = await http.get(
-          uri,
-        ); // or http.post depending on your use
-        if (response.statusCode == 200) {
-          print('✅ Response: ${response.body}');
-        } else {
-          print('❌ Error: ${response.statusCode}');
-        }
-      } catch (e) {
-        print('⚠️ Request failed: $e');
-      }
+      final Uri uri = Uri.parse('$baseUrl/api/batches');
 
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
-        print('✅ Received ${data.length} batches');
+        List data = jsonDecode(response.body);
+
+        debugPrint('📦 Total batches from API: ${data.length}');
+
+        final now = DateTime.now();
+
+        // Filter out only batches that have a toDate AND it's clearly in the past.
+        // Batches with no toDate / unparseable toDate are shown (benefit of the doubt).
         data = data.where((batch) {
-          // 1️⃣ Studio must exist
-          if (!_isValidStudio(batch['studioId'])) {
-            print('🗑️ Skipping batch (deleted studio): ${batch['batchName']}');
-            return false;
+          final rawDate = batch['toDate'];
+
+          if (rawDate == null) return true;
+
+          DateTime? endDate;
+
+          if (rawDate is String) {
+            endDate = DateTime.tryParse(rawDate);
           }
 
-          // 2️⃣ Branch must exist
-          if (!_isValidBranch(batch['branch'])) {
-            print('🗑️ Skipping batch (deleted branch): ${batch['batchName']}');
-            return false;
-          }
+          // If parsing fails → still show
+          if (endDate == null) return true;
 
-          return true;
+          // Allow even today's classes
+          return endDate.isAfter(now.subtract(Duration(days: 1)));
         }).toList();
 
-        if (data.isEmpty) {
-          return [];
-        }
+        debugPrint('✅ Batches after date filter: ${data.length}');
 
-        List<DanceClass> result = [];
-        for (final json in data) {
-          try {
-            print('📦 Processing batch: ${json['batchName']}');
-            print('📦 Raw batch data: $json');
-
-            final styleId = json['style']?.toString() ?? '';
-            final levelId = json['level']?.toString() ?? '';
-            final branchId = json['branch']?.toString() ?? '';
-
-            String styleName = 'Unknown Style';
-            try {
-              if (json['style'] is Map) {
-                final styleMap = json['style'] as Map;
-                styleName = styleMap['name']?.toString() ?? 'Unknown Style';
-              } else {
-                final style = _styleList.firstWhere(
-                  (s) => s['_id']?.toString() == styleId,
-                  orElse: () => {'name': 'Unknown Style'},
-                );
-                styleName = style['name'] ?? 'Unknown Style';
-              }
-            } catch (e) {
-              print('⚠️ Error getting style name for ID $styleId: $e');
-            }
-
-            String levelName = 'Unknown Level';
-            try {
-              if (json['level'] is Map) {
-                final levelMap = json['level'] as Map;
-                levelName = levelMap['name']?.toString() ?? 'Unknown Level';
-              } else {
-                final level = _levelList.firstWhere(
-                  (l) => l['_id']?.toString() == levelId,
-                  orElse: () => {'name': 'Unknown Level'},
-                );
-                levelName = level['name'] ?? 'Unknown Level';
-              }
-            } catch (e) {
-              print('⚠️ Error getting level name for ID $levelId: $e');
-            }
-
-            String studioName = 'Unknown Studio';
-            try {
-              if (json['studioId'] is Map) {
-                final studioMap = json['studioId'] as Map;
-                studioName =
-                    studioMap['studioName']?.toString() ?? 'Unknown Studio';
-              } else {
-                final studio = _studioList.firstWhere(
-                  (s) => s['_id']?.toString() == json['studioId']?.toString(),
-                  orElse: () => {'studioName': 'Unknown Studio'},
-                );
-                studioName = studio['studioName'] ?? 'Unknown Studio';
-              }
-            } catch (e) {
-              print(
-                '⚠️ Error getting studio name for ID ${json['studioId']}: $e',
-              );
-            }
-
-            String area = 'Unknown Location';
-            String branchLookupId = branchId;
-            Map? branchObj;
-
-            if (json['branch'] is Map) {
-              final branchMap = json['branch'] as Map;
-              if (branchMap['_id'] != null) {
-                branchLookupId = branchMap['_id'].toString();
-              } else if (branchMap['id'] != null) {
-                branchLookupId = branchMap['id'].toString();
-              }
-
-              if (_branchIdMap.containsKey(branchLookupId)) {
-                branchObj = _branchIdMap[branchLookupId];
-                if (branchObj != null &&
-                    branchObj['area'] != null &&
-                    branchObj['area'].toString().trim().isNotEmpty) {
-                  area = branchObj['area'];
-                  print(
-                    '✅ Merged area "$area" for class with branchId $branchLookupId',
-                  );
-                } else if (branchMap['area'] != null &&
-                    branchMap['area'].toString().trim().isNotEmpty) {
-                  area = branchMap['area'];
-                  print('✅ Used area from populated branch: "$area"');
-                }
-              } else {
-                print(
-                  '⚠️ No branch found for branchId $branchLookupId, area fallback to Unknown Location',
-                );
-              }
-            }
-
-            String locationName = 'Unknown Location';
-            try {
-              if (json['branch'] is Map) {
-                final branchMap = json['branch'] as Map;
-                locationName =
-                    branchMap['branchAddress']?.toString() ??
-                    'Unknown Location';
-              } else if (json['branch'] is String) {
-                locationName = json['branch'];
-              } else {
-                locationName = getBranchAddress(branchId);
-                if (locationName.isEmpty || locationName == 'null') {
-                  locationName = 'Unknown Location';
-                }
-              }
-            } catch (e) {
-              print('⚠️ Error getting branch name for ID $branchId: $e');
-              locationName = 'Unknown Location';
-            }
-
-            String daysText = 'No days specified';
-            try {
-              final days = json['days'] as List?;
-              if (days != null && days.isNotEmpty) {
-                daysText = days.join(', ');
-              }
-            } catch (e) {
-              print('⚠️ Error getting days for batch: $e');
-            }
-
-            String title = '$styleName • $levelName';
-            if (title == 'Unknown Style • Unknown Level') {
-              title = json['batchName'] ?? 'Unknown Batch';
-            }
-
-            final completeBatchData = Map<String, dynamic>.from({
-              ...json,
-              'style': styleName,
-              'level': levelName,
-              'branch': locationName,
-              'studioName': studioName,
-              'days': daysText,
-              'batchName': title,
-              'area': area,
-              'trainer': json['trainer'] ?? 'Unknown Trainer',
-              'fee': json['fee'] ?? '0',
-              'capacity': json['capacity'] ?? 0,
-              'fromDate': json['fromDate'] ?? DateTime.now().toIso8601String(),
-              'toDate': json['toDate'] ?? DateTime.now().toIso8601String(),
-              'startTime': json['startTime'] ?? '00:00',
-              'endTime': json['endTime'] ?? '00:00',
-              'enrolled_students': json['enrolled_students'] ?? [],
-            });
-
-            print(
-              '🟢 Final merged class data: area=${completeBatchData['area']}',
-            );
-
-            result.add(DanceClass.fromJson(completeBatchData));
-          } catch (e) {
-            print('⚠️ Error processing batch: $e');
-          }
-        }
-        return result;
+        return data.map((e) => DanceClass.fromJson(e)).toList();
       } else {
-        print('❌ API Error: ${response.statusCode} - ${response.body}');
-        if (response.statusCode == 400) {
-          print('🔍 400 Error Details:');
-          print('Request URI: $uri');
-          print('Query Parameters: $queryParameters');
-          print('Response Body: ${response.body}');
-        }
-        throw Exception('Failed to load dance classes: ${response.statusCode}');
+        throw Exception('Failed to load batches');
       }
     } catch (e) {
-      print('❌ Connection Error: $e');
-      rethrow;
+      debugPrint("Error fetching dance classes: $e");
+      return [];
     }
   }
 
   /// Helper to get initials for batch image placeholder
   String getBatchInitial(Map batchData) {
-    String? styleName = batchData['style'];
-    String? trainerName = batchData['trainerName'] ?? batchData['trainer'];
+    String? styleName = batchData['style'] is Map ? batchData['style']['name']?.toString() : batchData['style']?.toString();
+    if (styleName == null || styleName.isEmpty) {
+      styleName = batchData['styleName']?.toString();
+    }
+    String? trainerName = batchData['trainerName']?.toString() ?? (batchData['trainer'] is Map ? batchData['trainer']['name']?.toString() ?? batchData['trainer']['firstName']?.toString() : batchData['trainer']?.toString());
     if (styleName != null && styleName.isNotEmpty) {
       return styleName.trim()[0].toUpperCase();
     } else if (trainerName != null && trainerName.isNotEmpty) {
@@ -1066,7 +768,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       ],
                     ),
                   );
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                } else if (!snapshot.hasData) {
                   return const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1140,17 +842,65 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
                 final filteredClasses = (snapshot.data ?? []).where((cls) {
                   final query = _searchQuery.toLowerCase();
+
                   final matchesSearch =
+                      query.isEmpty ||
                       cls.title.toLowerCase().contains(query) ||
                       cls.studio.toLowerCase().contains(query) ||
                       cls.area.toLowerCase().contains(query);
+
                   final matchesArea =
                       _selectedAreas.isEmpty ||
-                      _selectedAreas.contains(cls.area);
-                  return matchesSearch && matchesArea;
-                }).toList();
+                      _selectedAreas.any(
+                        (a) => cls.area.toLowerCase().contains(a.toLowerCase()),
+                      );
 
-                if (filteredClasses.isEmpty && _searchQuery.isNotEmpty) {
+                  final matchesStudio =
+                      _selectedStudios.isEmpty ||
+                      _selectedStudios.any(
+                        (s) =>
+                            cls.studio.toLowerCase().contains(s.toLowerCase()),
+                      );
+
+                  final matchesDays =
+                      _selectedDays.isEmpty ||
+                      _selectedDays.any(
+                        (d) => cls.days.toLowerCase().contains(d.toLowerCase()),
+                      );
+
+                  return matchesSearch &&
+                      matchesArea &&
+                      matchesStudio &&
+                      matchesDays;
+                }).toList();
+                // ✅ ADD HERE
+                print("API COUNT: ${snapshot.data?.length}");
+                print("FILTERED COUNT: ${filteredClasses.length}");
+                if (filteredClasses.isEmpty) {
+                  if (_searchQuery.isNotEmpty) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'No classes match your search',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Try different search terms',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
                   return const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1158,7 +908,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         Icon(Icons.search_off, size: 64, color: Colors.grey),
                         SizedBox(height: 16),
                         Text(
-                          'No classes match your search',
+                          'No classes found',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -1166,7 +916,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Try different search terms',
+                          'Try adjusting your filters',
                           style: TextStyle(color: Colors.grey),
                         ),
                       ],
@@ -1219,7 +969,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
                                   final branchModel = BranchModel(
                                     id:
-                                        cls.batchData['branch']?.toString() ??
+                                        (cls.batchData['branch'] is Map ? cls.batchData['branch']['_id']?.toString() : cls.batchData['branch']?.toString()) ??
                                         '',
                                     name:
                                         cls.batchData['branchName']
@@ -1497,8 +1247,8 @@ class DanceClass {
     return DanceClass(
       title: json['batchName'] ?? 'No Name',
       studio: json['studioName'] ?? 'Unknown Studio',
-      location: json['branch'] ?? 'Unknown Location',
-      days: json['days'] ?? 'No days specified',
+      location: json['branch'] is String ? json['branch'] : (json['branchName'] ?? 'Unknown Location'),
+      days: json['days'] is List ? (json['days'] as List).join(', ') : (json['days']?.toString() ?? 'No days specified'),
       price: json['fee']?.toString() ?? '0',
       area: json['area'] ?? json['branchArea'] ?? 'Unknown Location',
       batchData: Map<String, dynamic>.from(json),
